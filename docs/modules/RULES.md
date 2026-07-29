@@ -126,11 +126,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 Each handler registers its own routes via `Register`. The central `internal/router.go` calls each handler's `Register`:
 
 ```go
-func NewRouter(uh *user.Handler, wh *workspace.Handler, ph *pipeline.Handler) http.Handler {
+func NewRouter(ah *auth.Handler, uh *user.Handler) http.Handler {
     mux := http.NewServeMux()
+    ah.Register(mux)
     uh.Register(mux)
-    wh.Register(mux)
-    ph.Register(mux)
     // ... middleware chain
 }
 ```
@@ -150,9 +149,9 @@ Order: repository depends on pool → service depends on repository → handler 
 ## 5. Naming conventions
 
 | Artifact | Pattern | Example |
-|---|---|---|
-| Directory | `internal/domain/{name}` | `internal/domain/user` |
-| Entity struct | PascalCase singular | `type Workspace struct` |
+|---|---|---|---|
+| Directory | `internal/domain/{name}` | `internal/domain/auth` |
+| Entity struct | PascalCase singular | `type User struct` |
 | Repository interface | `Repository` | `type Repository interface` |
 | PG implementation | `RepositoryPG` | `type RepositoryPG struct` |
 | Service | `Service` | `type Service struct` |

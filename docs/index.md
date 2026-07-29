@@ -19,11 +19,8 @@ docs/
 └── modules/                # Domain patterns (Enforce rules + editable docs)
     ├── RULES.md            — Domain creation rules (Enforce)
     ├── docsRules.md        — Domain documentation boilerplate (Enforce)
-    ├── examples/           — Example domains (editable, NOT real docs)
-    │   └── user/           — Example domain showing the full pattern
-    ├── user/               — User domain documentation
-    ├── workspace/          — Workspace domain documentation
-    └── pipeline/           — Pipeline domain documentation
+    ├── auth/               — Auth domain documentation
+    └── user/               — User domain documentation
 ```
 
 ## Section-specific rules
@@ -38,5 +35,4 @@ docs/
 
 - `RULES.md` is `type: Enforce`. All domains must follow its rules.
 - `docsRules.md` is `type: Enforce`. It is the boilerplate template for writing domain documentation. Use it whenever you document a new domain.
-- `examples/` contains example domains (`user/`). These are `type: editable` pattern references, NOT real documentation. Do not treat them as project docs.
-- Create new domain docs at the same level as `examples/`, not inside it.
+- Create new domain docs at the same level as `auth/`, not inside it.

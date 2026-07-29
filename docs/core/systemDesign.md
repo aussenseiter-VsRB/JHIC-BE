@@ -15,8 +15,8 @@ This is a **Go** backend service with a **domain-based** structure. The architec
 
 ```
 internal/domain/{domainName}/
-├── entity.go          — Domain struct and value objects
-├── repository.go      — Repository interface (for testability)
+├── entity.go          — Domain struct and value objects (e.g., Session)
+├── repository.go      — Repository interface(s) for testability
 ├── repository_pg.go   — Postgres implementation using pgx
 ├── service.go         — Business logic
 └── handler.go         — HTTP handlers (transport layer)
@@ -43,9 +43,8 @@ cmd/server/
 
 internal/
 ├── domain/                  — Business domains
-│   ├── user/
-│   ├── workspace/
-│   └── pipeline/
+│   ├── auth/
+│   └── user/
 ├── infrastructure/          — Shared infrastructure
 │   ├── database/            — pgxpool connection, migration runner
 │   ├── middleware/          — CORS, logging, auth
@@ -74,3 +73,4 @@ config/
 - **Domain isolation.** Each domain is a self-contained package. No cross-domain entity imports.
 - **Interface-based repos.** `repository.go` defines the contract; `repository_pg.go` implements it. Swap implementations for testing.
 - **Manual DI.** Dependencies are wired explicitly in `main.go`. No reflection, no DI framework.
+- **Opaque bearer tokens.** Sessions stored in a `sessions` table. No JWT dependency. Instant revocation.

@@ -1,7 +1,7 @@
 ---
 name: User Domain Documentation
 relation: RULES.md → modules/user/
-description: Documentation for the user domain — identity and account management
+description: Documentation for the user domain — profile management and role assignment
 type: editable
 ---
 
@@ -9,7 +9,7 @@ type: editable
 
 ## Overview
 
-The `user` domain manages user identities. It provides CRUD operations for user accounts and is the owner reference for workspaces.
+The `user` domain manages user profiles and role assignments. It reads from the same `users` table as the auth domain but never exposes password hashes. Roles control access: `jurnal`, `guru`, `admin`, `user`.
 
 ## Entity
 
@@ -18,6 +18,7 @@ type User struct {
     ID        string    `json:"id"`
     Email     string    `json:"email"`
     Name      string    `json:"name"`
+    Role      string    `json:"role"`
     AvatarURL string    `json:"avatar_url,omitempty"`
     CreatedAt time.Time `json:"created_at"`
     UpdatedAt time.Time `json:"updated_at"`
@@ -29,33 +30,48 @@ type User struct {
 | Method | Path | Handler | Description |
 |---|---|---|---|
 | GET | /api/v1/users | List | List all users |
-| POST | /api/v1/users | Create | Create a new user |
 | GET | /api/v1/users/{id} | Get | Get user by ID |
-| PUT | /api/v1/users/{id} | Update | Update user |
+| PUT | /api/v1/users/{id} | Update | Update profile (name, avatar_url) |
+| PUT | /api/v1/users/{id}/role | UpdateRole | Update user role |
 | DELETE | /api/v1/users/{id} | Delete | Delete user |
 
 ## Data flow
 
 ```
-POST /api/v1/users
-  → handler.Create: decode JSON → validate email+name required → call service.Create
-    → service.Create: check duplicate email → generate UUID → set timestamps → call repo.Create
-      → repository_pg.Create: INSERT INTO users (id, email, name, avatar_url, ...)
+GET /api/v1/users
+  → handler.List → service.List → repository_pg.List (SELECT without password_hash)
+
+PUT /api/v1/users/{id}/role
+  → handler.UpdateRole → service.UpdateRole (validates role is one of: jurnal, guru, admin, user)
+    → repository_pg.UpdateRole (UPDATE users SET role = $2)
 ```
 
 ## Rules
 
-- Email must be unique. Service returns an error if a user with the same email already exists.
-- `avatar_url` is optional — defaults to empty string.
-- User deletion cascades to owned workspaces (DB foreign key `ON DELETE CASCADE`).
+- Valid roles: `jurnal`, `guru`, `admin`, `user`.
+- The user domain shares the `users` table with the auth domain but never selects `password_hash`.
+- Deleting a user cascades to their sessions (DB foreign key `ON DELETE CASCADE`).
+- Profile updates (`PUT /api/v1/users/{id}`) only modify `name` and `avatar_url`.
 
 ## cURL examples
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/users \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"alice@example.com","name":"Alice"}'
-
+# List users
 curl http://localhost:8080/api/v1/users
+
+# Get user
 curl http://localhost:8080/api/v1/users/{id}
+
+# Update profile
+curl -X PUT http://localhost:8080/api/v1/users/{id} \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Alice Updated","avatar_url":"https://example.com/avatar.jpg"}'
+
+# Update role
+curl -X PUT http://localhost:8080/api/v1/users/{id}/role \
+  -H 'Content-Type: application/json' \
+  -d '{"role":"admin"}'
+
+# Delete user
+curl -X DELETE http://localhost:8080/api/v1/users/{id}
 ```

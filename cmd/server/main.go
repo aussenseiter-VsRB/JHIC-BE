@@ -13,9 +13,8 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/config"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
-	pipelineDomain "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pipeline"
-	userDomain "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
-	workspaceDomain "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/workspace"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
 	"github.com/joho/godotenv"
 )
@@ -25,6 +24,7 @@ func main() {
 	_ = godotenv.Load(filepath.Join(filepath.Dir(exe), ".env"))
 	_ = godotenv.Load()
 	cfg := config.Load()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -38,19 +38,16 @@ func main() {
 		log.Fatalf("migrations: %v", err)
 	}
 
-	userRepo := userDomain.NewRepository(pool)
-	userSvc := userDomain.NewService(userRepo)
-	userHnd := userDomain.NewHandler(userSvc)
+	usersRepo := auth.NewUsersRepository(pool)
+	sessionsRepo := auth.NewSessionsRepository(pool)
+	authSvc := auth.NewService(usersRepo, sessionsRepo)
+	authHnd := auth.NewHandler(authSvc)
 
-	workspaceRepo := workspaceDomain.NewRepository(pool)
-	workspaceSvc := workspaceDomain.NewService(workspaceRepo)
-	workspaceHnd := workspaceDomain.NewHandler(workspaceSvc)
+	userRepo := user.NewRepository(pool)
+	userSvc := user.NewService(userRepo)
+	userHnd := user.NewHandler(userSvc)
 
-	pipelineRepo := pipelineDomain.NewRepository(pool)
-	pipelineSvc := pipelineDomain.NewService(pipelineRepo)
-	pipelineHnd := pipelineDomain.NewHandler(pipelineSvc)
-
-	router := internal.NewRouter(userHnd, workspaceHnd, pipelineHnd)
+	router := internal.NewRouter(authHnd, userHnd)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),

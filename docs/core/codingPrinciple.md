@@ -79,7 +79,7 @@ Define repository interfaces in `repository.go` with only the methods the domain
 | Service | `service.go` | `type Service struct` |
 | Handler | `handler.go` | `type Handler struct` |
 
-- Packages: lowercase, one word (`user`, `workspace`, `pipeline`).
+- Packages: lowercase, one word (`auth`, `user`).
 - Files: snake_case (`repository_pg.go`).
 - Types: PascalCase (`RepositoryPG`, `CreateUserInput`).
 - Handlers: `func (h *Handler) List`, `Create`, `Get`, `Update`, `Delete`.

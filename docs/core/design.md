@@ -23,7 +23,7 @@ type: Enforce
 
 **Decision:** Each domain is a standalone Go package under `internal/domain/`. Domains do not import each other's entities.
 
-**Rationale:** Cross-domain imports create tight coupling and circular dependency issues. If a domain needs data from another domain, it goes through the service layer (e.g., `workspace.Service` called by a higher-level orchestrator), not by importing workspace entities into the user package.
+**Rationale:** Cross-domain imports create tight coupling and circular dependency issues. If a domain needs data from another domain, it goes through the service layer (e.g., `user.Service` called by a higher-level orchestrator), not by importing user entities into the auth package.
 
 ## Manual dependency injection (2026-07-20)
 
