@@ -1,0 +1,10 @@
+services:
+  api:
+    build: .
+    container_name: jhic-be
+    ports:
+      - "${HOST_PORT:-8085}:8080"
+    environment:
+      - PORT=8080
+      - DATABASE_URL=${DATABASE_URL}
+    restart: unless-stopped

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -16,9 +17,13 @@ import (
 	userDomain "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	workspaceDomain "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/workspace"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	exe, _ := os.Executable()
+	_ = godotenv.Load(filepath.Join(filepath.Dir(exe), ".env"))
+	_ = godotenv.Load()
 	cfg := config.Load()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
