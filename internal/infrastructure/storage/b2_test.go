@@ -49,21 +49,6 @@ func TestB2Client_UploadDeleteRoundTrip(t *testing.T) {
 	_ = objectKey
 }
 
-func TestPublicURLFormat(t *testing.T) {
-	c := &B2Client{
-		bucket:   "my-bucket",
-		endpoint: "s3.region.example.com",
-	}
-
-	// Verify URL construction logic matches the code in Upload
-	clean := "path/to/object.jpg"
-	want := "https://my-bucket.s3.region.example.com/path/to/object.jpg"
-	got := "https://" + c.bucket + "." + c.endpoint + "/" + clean
-	if got != want {
-		t.Errorf("public URL = %q, want %q", got, want)
-	}
-}
-
 func TestB2Client_NewWithConfig(t *testing.T) {
 	ctx := context.Background()
 	cfg := B2Config{

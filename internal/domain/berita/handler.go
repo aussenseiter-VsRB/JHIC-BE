@@ -1,6 +1,7 @@
 package berita
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
@@ -26,12 +28,12 @@ func NewHandler(svc *Service, store stor.Client) *Handler {
 }
 
 func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler) {
-	mux.Handle("POST /api/v1/berita", roleMw(authMw(http.HandlerFunc(h.Create))))
-	mux.Handle("GET /api/v1/berita", roleMw(authMw(http.HandlerFunc(h.List))))
-	mux.Handle("GET /api/v1/berita/{id}", roleMw(authMw(http.HandlerFunc(h.Get))))
-	mux.Handle("PUT /api/v1/berita/{id}", roleMw(authMw(http.HandlerFunc(h.Update))))
-	mux.Handle("DELETE /api/v1/berita/{id}", roleMw(authMw(http.HandlerFunc(h.Delete))))
-	mux.Handle("POST /api/v1/berita/{id}/image", roleMw(authMw(http.HandlerFunc(h.UploadImage))))
+	mux.Handle("POST /api/v1/berita", authMw(roleMw(http.HandlerFunc(h.Create))))
+	mux.Handle("GET /api/v1/berita", authMw(roleMw(http.HandlerFunc(h.List))))
+	mux.Handle("GET /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Get))))
+	mux.Handle("PUT /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Update))))
+	mux.Handle("DELETE /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Delete))))
+	mux.Handle("POST /api/v1/berita/{id}/image", authMw(roleMw(http.HandlerFunc(h.UploadImage))))
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +57,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.signImageURL(r.Context(), b)
 	response.JSON(w, http.StatusCreated, b)
 }
 
@@ -63,6 +66,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	for i := range list {
+		h.signImageURL(r.Context(), &list[i])
 	}
 	response.JSON(w, http.StatusOK, list)
 }
@@ -78,6 +84,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusNotFound, "berita not found")
 		return
 	}
+	h.signImageURL(r.Context(), b)
 	response.JSON(w, http.StatusOK, b)
 }
 
@@ -106,6 +113,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.signImageURL(r.Context(), b)
 	response.JSON(w, http.StatusOK, b)
 }
 
@@ -124,10 +132,13 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if b.ImageURL != "" {
-		objectPath, parseErr := extractObjectPath(b.ImageURL)
-		if parseErr == nil {
-			_ = h.store.Delete(r.Context(), objectPath)
+		path := b.ImageURL
+		if strings.Contains(path, "://") {
+			if p, err := extractObjectPath(path); err == nil {
+				path = p
+			}
 		}
+		_ = h.store.Delete(r.Context(), path)
 	}
 
 	if err := h.svc.Delete(r.Context(), id, userID); err != nil {
@@ -218,7 +229,20 @@ func (h *Handler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.signImageURL(r.Context(), b)
 	response.JSON(w, http.StatusOK, map[string]string{"image_url": b.ImageURL})
+}
+
+func (h *Handler) signImageURL(ctx context.Context, b *Berita) {
+	if b.ImageURL == "" {
+		return
+	}
+	signed, err := h.store.PresignGet(ctx, b.ImageURL, 24*time.Hour)
+	if err != nil {
+		b.ImageURL = ""
+		return
+	}
+	b.ImageURL = signed
 }
 
 func extractObjectPath(imageURL string) (string, error) {

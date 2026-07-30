@@ -74,8 +74,20 @@ func (c *B2Client) Upload(ctx context.Context, objectPath string, contentType st
 		return "", fmt.Errorf("s3 upload: %w", err)
 	}
 
-	publicURL := fmt.Sprintf("https://%s.%s/%s", c.bucket, c.endpoint, clean)
-	return publicURL, nil
+	return clean, nil
+}
+
+func (c *B2Client) PresignGet(ctx context.Context, objectPath string, ttl time.Duration) (string, error) {
+	clean := strings.TrimPrefix(objectPath, "/")
+	presignClient := s3.NewPresignClient(c.client)
+	req, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(clean),
+	}, s3.WithPresignExpires(ttl))
+	if err != nil {
+		return "", fmt.Errorf("presign get: %w", err)
+	}
+	return req.URL, nil
 }
 
 func (c *B2Client) Delete(ctx context.Context, objectPath string) error {

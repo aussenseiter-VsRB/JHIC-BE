@@ -1,0 +1,637 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "JHIC-BE API",
+    "description": "API collection for JHIC-BE (Jurnal Harian Islamic Center)\n\n## Auth\n- Register & Login to get a Bearer token\n- Token & user_id auto-fill via Login/Register test scripts\n- Berita endpoints require role: \"jurnal\"\n- Valid roles: user, jurnal, guru, admin\n\n## Seed Data (run `go run ./cmd/seed/`)\n| Email | Password | Role |\n|---|---|---|\n| admin@jhic.com | admin123 | admin |\n| jurnal@jhic.com | jurnal123 | jurnal |\n| user@jhic.com | user123 | user |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "berita_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "health"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"status\": \"ok\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('token', json.token);",
+                  "    pm.collectionVariables.set('user_id', json.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jurnalis@example.com\",\n  \"password\": \"secret123\",\n  \"name\": \"Jurnalis Handal\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          },
+          "response": [
+            {
+              "name": "Created",
+              "status": "Created",
+              "code": 201,
+              "header": [],
+              "body": "{\n  \"user\": {\n    \"id\": \"...\",\n    \"email\": \"jurnalis@example.com\",\n    \"name\": \"Jurnalis Handal\",\n    \"role\": \"user\",\n    \"created_at\": \"2026-07-30T...\",\n    \"updated_at\": \"2026-07-30T...\"\n  },\n  \"token\": \"abc123...\"\n}"
+            },
+            {
+              "name": "Unprocessable",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "header": [],
+              "body": "{\n  \"error\": \"user with email jurnalis@example.com already exists\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('token', json.token);",
+                  "    pm.collectionVariables.set('user_id', json.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jurnal@jhic.com\",\n  \"password\": \"jurnal123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"user\": {\n    \"id\": \"2856f12d-847d-43f2-a4fe-3643ea44e290\",\n    \"email\": \"jurnal@jhic.com\",\n    \"name\": \"Jurnalis User\",\n    \"role\": \"jurnal\",\n    \"created_at\": \"2026-07-30T02:43:14.889739Z\",\n    \"updated_at\": \"2026-07-30T02:43:14.889739Z\"\n  },\n  \"token\": \"09f0fbfffa2ef352...\"\n}"
+            },
+            {
+              "name": "Unauthorized",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [],
+              "body": "{\n  \"error\": \"invalid email or password\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Logout",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          },
+          "response": [
+            {
+              "name": "No Content",
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
+            },
+            {
+              "name": "Unauthorized",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [],
+              "body": "{\n  \"error\": \"invalid or expired token\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GET List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "[\n  {\n    \"id\": \"2856f12d-847d-43f2-a4fe-3643ea44e290\",\n    \"email\": \"jurnal@jhic.com\",\n    \"name\": \"Jurnalis User\",\n    \"role\": \"jurnal\",\n    \"created_at\": \"2026-07-30T02:43:14.889739Z\",\n    \"updated_at\": \"2026-07-30T02:43:14.889739Z\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "GET User by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"id\": \"2856f12d-847d-43f2-a4fe-3643ea44e290\",\n  \"email\": \"jurnal@jhic.com\",\n  \"name\": \"Jurnalis User\",\n  \"role\": \"jurnal\",\n  \"created_at\": \"2026-07-30T02:43:14.889739Z\",\n  \"updated_at\": \"2026-07-30T02:43:14.889739Z\"\n}"
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [],
+              "body": "{\n  \"error\": \"user not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "PUT Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jurnalis Updated\",\n  \"avatar_url\": \"https://example.com/avatar.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"id\": \"...\",\n  \"email\": \"jurnalis@example.com\",\n  \"name\": \"Jurnalis Updated\",\n  \"role\": \"user\",\n  \"avatar_url\": \"https://example.com/avatar.jpg\",\n  \"created_at\": \"2026-07-30T...\",\n  \"updated_at\": \"2026-07-30T...\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "PUT Update Role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"jurnal\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/role",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}", "role"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"message\": \"role updated\"\n}"
+            },
+            {
+              "name": "Unprocessable",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "header": [],
+              "body": "{\n  \"error\": \"invalid role: must be one of [jurnal guru admin user]\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "DELETE User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "No Content",
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Berita",
+      "item": [
+        {
+          "name": "POST Create Berita",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('berita_id', json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Kegiatan Islamic Center Hari Ini\",\n  \"content\": \"Hari ini Islamic Center mengadakan kegiatan belajar mengaji dan kajian rutin pekanan.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/berita",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "berita"]
+            }
+          },
+          "response": [
+            {
+              "name": "Created",
+              "status": "Created",
+              "code": 201,
+              "header": [],
+              "body": "{\n  \"id\": \"...\",\n  \"author_id\": \"...\",\n  \"title\": \"Kegiatan Islamic Center Hari Ini\",\n  \"content\": \"Hari ini Islamic Center...\",\n  \"created_at\": \"2026-07-30T...\",\n  \"updated_at\": \"2026-07-30T...\"\n}"
+            },
+            {
+              "name": "Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [],
+              "body": "{\n  \"error\": \"title and content are required\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET List Berita",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/berita",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "berita"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "[\n  {\n    \"id\": \"...\",\n    \"author_id\": \"...\",\n    \"title\": \"Kegiatan Islamic Center Hari Ini\",\n    \"content\": \"Hari ini Islamic Center...\",\n    \"created_at\": \"2026-07-30T...\",\n    \"updated_at\": \"2026-07-30T...\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "GET Berita by ID",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/berita/{{berita_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "berita", "{{berita_id}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"id\": \"...\",\n  \"author_id\": \"...\",\n  \"title\": \"Kegiatan Islamic Center Hari Ini\",\n  \"content\": \"Hari ini Islamic Center...\",\n  \"created_at\": \"2026-07-30T...\",\n  \"updated_at\": \"2026-07-30T...\"\n}"
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [],
+              "body": "{\n  \"error\": \"berita not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "PUT Update Berita",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Kegiatan Islamic Center Hari Ini (Updated)\",\n  \"content\": \"Konten berita telah diperbarui dengan informasi terbaru.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/berita/{{berita_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "berita", "{{berita_id}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"id\": \"...\",\n  \"author_id\": \"...\",\n  \"title\": \"Kegiatan Islamic Center Hari Ini (Updated)\",\n  \"content\": \"Konten berita telah diperbarui...\",\n  \"created_at\": \"2026-07-30T...\",\n  \"updated_at\": \"2026-07-30T...\"\n}"
+            },
+            {
+              "name": "Forbidden",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [],
+              "body": "{\n  \"error\": \"forbidden: not the author\"\n}"
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [],
+              "body": "{\n  \"error\": \"berita not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Upload Image",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "",
+                  "description": "Select an image file (jpeg, png, gif, webp, max 5 MB)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/berita/{{berita_id}}/image",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "berita", "{{berita_id}}", "image"]
+            }
+          },
+          "response": [
+            {
+              "name": "OK",
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"image_url\": \"https://jhic-berita-images.s3.eu-central-003.backblazeb2.com/berita/xxx/abc123.jpg\"\n}"
+            },
+            {
+              "name": "Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [],
+              "body": "{\n  \"error\": \"unsupported image type\"\n}"
+            },
+            {
+              "name": "Forbidden",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [],
+              "body": "{\n  \"error\": \"forbidden: not the author\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "DELETE Berita",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/berita/{{berita_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "berita", "{{berita_id}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "No Content",
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
+            },
+            {
+              "name": "Forbidden",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [],
+              "body": "{\n  \"error\": \"forbidden: not the author\"\n}"
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [],
+              "body": "{\n  \"error\": \"berita not found\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
