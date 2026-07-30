@@ -44,11 +44,13 @@ cmd/server/
 internal/
 ├── domain/                  — Business domains
 │   ├── auth/
-│   └── user/
+│   ├── user/
+│   └── berita/
 ├── infrastructure/          — Shared infrastructure
 │   ├── database/            — pgxpool connection, migration runner
-│   ├── middleware/          — CORS, logging, auth
-│   └── response/            — JSON response helpers
+│   ├── middleware/          — CORS, logging, auth, role
+│   ├── response/            — JSON response helpers
+│   └── storage/             — S3-compatible storage (Backblaze B2 / MinIO)
 ├── pkg/id/                  — UUID v4 generator (stdlib only)
 └── router.go                — Route registration + middleware chain
 
@@ -63,8 +65,9 @@ config/
 3. Run pending SQL migrations
 4. Instantiate repositories → services → handlers (manual DI)
 5. Register routes on `http.ServeMux`
-6. Apply middleware chain (logger → CORS)
-7. Start server with graceful shutdown
+6. Instantiate middleware (auth token validator, role checker)
+7. Apply middleware chain (logger → CORS — globally; auth + role applied per-route on protected endpoints)
+8. Start server with graceful shutdown on SIGINT/SIGTERM
 
 ## Key principles
 

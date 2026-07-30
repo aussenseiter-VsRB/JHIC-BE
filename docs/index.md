@@ -20,7 +20,8 @@ docs/
     ├── RULES.md            — Domain creation rules (Enforce)
     ├── docsRules.md        — Domain documentation boilerplate (Enforce)
     ├── auth/               — Auth domain documentation
-    └── user/               — User domain documentation
+    ├── user/               — User domain documentation
+    └── berita/             — Berita (news) domain documentation
 ```
 
 ## Section-specific rules

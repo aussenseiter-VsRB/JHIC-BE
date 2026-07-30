@@ -17,7 +17,7 @@ This project uses a frontmatter-based documentation system. Every `.md` file (ex
 2. **Respect the relation chain.** Before writing code in any area, read all docs in its relation chain. For example, to add a new domain, read: `README.md → index.md → docs/modules/RULES.md`.
 3. **No duplicate rules.** If a rule exists in an `Enforce` doc, do not repeat it elsewhere. Reference it by document name instead.
 4. **Read Enforce files before writing.** Always read all `Enforce` files relevant to your task before creating or modifying any code.
-5. **Domain structure.** Each business domain is a top-level package under `internal/domain/`. Every domain has: `entity.go`, `repository.go`, `repository_pg.go`, `service.go`, `handler.go`, `types.go`.
+5. **Domain structure.** Each business domain is a top-level package under `internal/domain/`. Every domain has: `entity.go`, `repository.go`, `repository_pg.go`, `service.go`, `handler.go`. Optionally `types.go` or `errors.go` for auxiliary types.
 6. **No framework.** The project uses Go stdlib only (`net/http`, `database/sql`, `context`). No Gin, Echo, or ORM.
 7. **Layered architecture.** Data flows one direction: `handler → service → repository (interface)`. Never the reverse.
 

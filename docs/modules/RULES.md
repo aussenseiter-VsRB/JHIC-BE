@@ -104,15 +104,27 @@ func NewHandler(svc *Service) *Handler {
 }
 ```
 
-Must implement a `Register` method:
+Must implement a `Register` method. For public or auth-only domains, accept only the mux:
 
 ```go
 func (h *Handler) Register(mux *http.ServeMux) {
-    mux.HandleFunc("GET /api/v1/{resource}", h.List)
-    mux.HandleFunc("POST /api/v1/{resource}", h.Create)
-    mux.HandleFunc("GET /api/v1/{resource}/{id}", h.Get)
-    mux.HandleFunc("PUT /api/v1/{resource}/{id}", h.Update)
-    mux.HandleFunc("DELETE /api/v1/{resource}/{id}", h.Delete)
+    mux.HandleFunc("GET /api/v1/users", h.List)
+    mux.HandleFunc("GET /api/v1/users/{id}", h.Get)
+    mux.HandleFunc("PUT /api/v1/users/{id}", h.Update)
+    mux.HandleFunc("DELETE /api/v1/users/{id}", h.Delete)
+}
+```
+
+For domains that require auth + role middleware on all routes, accept the middleware functions as parameters:
+
+```go
+func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler) {
+    mux.Handle("POST /api/v1/berita", authMw(roleMw(http.HandlerFunc(h.Create))))
+    mux.Handle("GET /api/v1/berita", authMw(roleMw(http.HandlerFunc(h.List))))
+    mux.Handle("GET /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Get))))
+    mux.Handle("PUT /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Update))))
+    mux.Handle("DELETE /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Delete))))
+    mux.Handle("POST /api/v1/berita/{id}/image", authMw(roleMw(http.HandlerFunc(h.UploadImage))))
 }
 ```
 
@@ -126,11 +138,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 Each handler registers its own routes via `Register`. The central `internal/router.go` calls each handler's `Register`:
 
 ```go
-func NewRouter(ah *auth.Handler, uh *user.Handler) http.Handler {
+func NewRouter(ah *auth.Handler, uh *user.Handler, bh *berita.Handler, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler) http.Handler {
     mux := http.NewServeMux()
     ah.Register(mux)
     uh.Register(mux)
-    // ... middleware chain
+    bh.Register(mux, authMw, roleMw)
+    // ... global middleware chain
 }
 ```
 

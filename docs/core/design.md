@@ -48,3 +48,21 @@ type: Enforce
 **Decision:** Generate UUIDs client-side in Go using `crypto/rand` (`internal/pkg/id/id.go`), not database-side `gen_random_uuid()`.
 
 **Rationale:** Client-side UUIDs let services create entities and return them immediately without a round-trip to get the generated ID. The stdlib approach avoids adding the `google/uuid` dependency.
+
+## S3-compatible storage (2026-07-20)
+
+**Decision:** Use `aws-sdk-go-v2` with Backblaze B2 as the primary object store. Support MinIO for local development via Docker Compose profiles.
+
+**Rationale:** Backblaze B2 is S3-compatible, so the standard AWS SDK works without a custom client. The `storage.Client` interface (`Upload`, `Delete`, `PresignGet`) keeps the storage layer swappable — swap the endpoint and credentials to point at MinIO, AWS S3, or any S3-compatible store. Presigned URLs avoid exposing bucket credentials to clients and enable direct browser uploads if needed. The interface is in `internal/infrastructure/storage/storage.go`, with a B2 implementation in `b2.go`.
+
+## Role-based access control (2026-07-20)
+
+**Decision:** Implement RBAC as middleware (`internal/infrastructure/middleware/role.go`) that checks the caller's role against an allowed list. Roles are stored in the `users` table.
+
+**Rationale:** Middleware-level RBAC is declarative — a handler declares which roles are allowed when registering its routes (e.g., `RequireRole("jurnal")`). Role lookup uses the `UserRepository.ByID` interface, keeping the middleware agnostic of the user domain implementation. Supported roles: `admin`, `jurnal`, `guru`, `user`.
+
+## Image upload with server-side MIME validation (2026-07-20)
+
+**Decision:** Validate image MIME types server-side using `net/http.DetectContentType`, enforce a 5 MB max upload size via `http.MaxBytesReader`, and store images under `berita/{beritaID}/{uuid}.{ext}` paths in object storage.
+
+**Rationale:** Client-side MIME checks are trivially bypassed. Server-side detection using the first 512 bytes (`http.DetectContentType`) matches what browsers send and prevents non-image uploads. MaxBytesReader limits memory usage and prevents abuse. The key prefix per berita groups related images together in the bucket listing.
