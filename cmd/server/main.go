@@ -14,8 +14,11 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/config"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/storage"
 	"github.com/joho/godotenv"
 )
 
@@ -47,7 +50,38 @@ func main() {
 	userSvc := user.NewService(userRepo)
 	userHnd := user.NewHandler(userSvc)
 
-	router := internal.NewRouter(authHnd, userHnd)
+	b2Cfg := storage.B2Config{
+		Endpoint: cfg.B2Endpoint,
+		Region:   cfg.B2Region,
+		KeyID:    cfg.B2KeyID,
+		AppKey:   cfg.B2AppKey,
+		Bucket:   cfg.B2Bucket,
+	}
+	b2Client, err := storage.NewB2Client(ctx, b2Cfg)
+	if err != nil {
+		log.Fatalf("b2 storage: %v", err)
+	}
+
+	beritaRepo := berita.NewRepository(pool)
+	beritaSvc := berita.NewService(beritaRepo)
+	beritaHnd := berita.NewHandler(beritaSvc, b2Client)
+
+	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
+	authMw := middleware.Auth(tokenValidator)
+	roleCheck := userSvc.ByID
+	roleChecker := func(ctx context.Context, userID string) (string, error) {
+		u, err := roleCheck(ctx, userID)
+		if err != nil {
+			return "", err
+		}
+		if u == nil {
+			return "", fmt.Errorf("user not found")
+		}
+		return u.Role, nil
+	}
+	roleMw := middleware.RequireRole("jurnal")(roleChecker)
+
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, authMw, roleMw)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
