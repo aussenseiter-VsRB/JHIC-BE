@@ -20,6 +20,7 @@ docs/
 └── modules/                # Domain patterns (Enforce rules + editable docs)
     ├── RULES.md            — Domain creation rules (Enforce)
     ├── docsRules.md        — Domain documentation boilerplate (Enforce)
+    ├── featureTesting.md   — Procedure for testing a new feature (Enforce)
     ├── auth/               — Auth domain documentation
     ├── user/               — User domain documentation
     └── berita/             — Berita (news) domain documentation
@@ -38,4 +39,5 @@ docs/
 
 - `RULES.md` is `type: Enforce`. All domains must follow its rules.
 - `docsRules.md` is `type: Enforce`. It is the boilerplate template for writing domain documentation. Use it whenever you document a new domain.
+- `featureTesting.md` is `type: Enforce`. Follow its procedure whenever you implement or modify a feature that needs tests.
 - Create new domain docs at the same level as `auth/`, not inside it.

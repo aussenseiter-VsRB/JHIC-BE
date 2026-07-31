@@ -33,9 +33,14 @@ func NewB2Client(ctx context.Context, cfg B2Config) (*B2Client, error) {
 		Timeout: 30 * time.Second,
 	}
 
+	endpointURL := cfg.Endpoint
+	if !strings.Contains(endpointURL, "://") {
+		endpointURL = fmt.Sprintf("https://%s", cfg.Endpoint)
+	}
+
 	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
-			URL:               fmt.Sprintf("https://%s", cfg.Endpoint),
+			URL:               endpointURL,
 			HostnameImmutable: true,
 		}, nil
 	})
