@@ -12,7 +12,7 @@ type: Enforce
 | Tier | Target | External deps | Run command |
 |---|---|---|---|
 | Unit | Pure business logic (`service.go`) | Mocked | `go test ./...` |
-| Component Integration | Structural components (`repository_pg.go`, storage) | Real, containerized | `go test -tags=integration ./...` |
+| Component Integration | Structural components (`pg/` adapters, storage) | Real, containerized | `go test -tags=integration ./...` |
 | E2E API | Full HTTP transaction through the real router | Real, containerized | `go test -tags=e2e ./...` |
 
 All three tiers are mandatory. A feature is not complete until it has coverage at the tiers where its behavior lives: business rules in unit tests, storage/DB interaction in component tests, and the end-to-end workflow in E2E tests.
@@ -46,7 +46,7 @@ func TestService_Update(t *testing.T) {
 
 Validate how code interacts with structural components. This includes tracking active database connections, third-party services, cache layers, and message brokers.
 
-- `repository_pg.go` is tested against a **real Postgres** container; the storage `Client` is tested against a **real S3-compatible store (MinIO)**.
+- The `pg/` adapter of each domain is tested against a **real Postgres** container; the storage `Client` is tested against a **real S3-compatible store (MinIO)**.
 - Every structural component gets the same treatment: containerize the real thing, exercise the real behavior, assert results, assert resource cleanup.
 - **Track active database connections.** Assert `pool.Stat()` (`TotalConns`, `AcquiredConns`) before and after each test — connection counts must return to baseline. A rising `AcquiredConns` after tests is a leak and fails the suite.
 - Verify third-party service round-trips end to end: `Upload` → object exists → `PresignGet` → signed URL is fetchable → `Delete` → object gone.
@@ -56,10 +56,10 @@ Validate how code interacts with structural components. This includes tracking a
 ```go
 //go:build integration
 
-func TestRepositoryPG_Create(t *testing.T) {
+func TestRepository_Create(t *testing.T) {
     pool := startPostgres(t) // t.Cleanup terminates container
     before := pool.Stat().AcquiredConns()
-    repo := NewRepository(pool)
+    repo := pg.NewRepository(pool)
     // ... exercise, assert
     require.Equal(t, before, pool.Stat().AcquiredConns())
 }

@@ -42,25 +42,25 @@ All berita endpoints require authentication (`Bearer` token) and the `jurnal` ro
 
 ```
 GET /api/v1/berita
-  → handler.List → service.List → repository_pg.List (SELECT ... ORDER BY created_at DESC)
+  → handler.List → service.List → pg.List (SELECT ... ORDER BY created_at DESC)
   → handler signs each image_url via PresignGet (24h TTL)
 
 POST /api/v1/berita
   → handler.Create: decode JSON → validate title+content → call service.Create
     → service.Create: generate ID → create record
-      → repository_pg.Create: INSERT INTO berita (id, author_id, title, content, ...)
+      → pg.Create: INSERT INTO berita (id, author_id, title, content, ...)
   → handler signs image_url before response
 
 POST /api/v1/berita/{id}/image
   → handler.UploadImage: parse multipart form → validate MIME type (jpeg/png/gif/webp)
     → enforce 5 MB max via MaxBytesReader
     → generate UUID filename → upload to storage via store.Upload
-    → call service.SetImage → repository_pg.Update (set image_url)
+    → call service.SetImage → pg.Update (set image_url)
   → handler signs image_url before response
 
 DELETE /api/v1/berita/{id}
   → handler.Delete: fetch article → if has image, delete from storage → call service.Delete
-    → service.Delete: verify caller is author → repository_pg.Delete
+    → service.Delete: verify caller is author → pg.Delete
 ```
 
 ## Rules

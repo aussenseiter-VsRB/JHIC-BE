@@ -14,8 +14,11 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/config"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
+	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
+	beritapg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
+	userpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/storage"
@@ -41,12 +44,12 @@ func main() {
 		log.Fatalf("migrations: %v", err)
 	}
 
-	usersRepo := auth.NewUsersRepository(pool)
-	sessionsRepo := auth.NewSessionsRepository(pool)
+	usersRepo := authpg.NewUsersRepository(pool)
+	sessionsRepo := authpg.NewSessionsRepository(pool)
 	authSvc := auth.NewService(usersRepo, sessionsRepo)
 	authHnd := auth.NewHandler(authSvc)
 
-	userRepo := user.NewRepository(pool)
+	userRepo := userpg.NewRepository(pool)
 	userSvc := user.NewService(userRepo)
 	userHnd := user.NewHandler(userSvc)
 
@@ -62,7 +65,7 @@ func main() {
 		log.Fatalf("b2 storage: %v", err)
 	}
 
-	beritaRepo := berita.NewRepository(pool)
+	beritaRepo := beritapg.NewRepository(pool)
 	beritaSvc := berita.NewService(beritaRepo)
 	beritaHnd := berita.NewHandler(beritaSvc, b2Client)
 

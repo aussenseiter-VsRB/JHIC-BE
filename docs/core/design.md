@@ -33,9 +33,9 @@ type: Enforce
 
 ## Repository interfaces for testability (2026-07-20)
 
-**Decision:** Every domain has a `repository.go` file defining an interface, and a `repository_pg.go` implementing it with pgx.
+**Decision:** Every domain has a `repository.go` file defining an interface, and a `pg/` subpackage implementing it with pgx (types drop the `PG` suffix inside the adapter package).
 
-**Rationale:** The interface lets services be unit-tested with mock repositories without spinning up a database. It also makes it trivial to swap implementations (e.g., adding Redis caching via a decorated repository).
+**Rationale:** The interface lets services be unit-tested with mock repositories without spinning up a database. It also makes it trivial to swap implementations (e.g., adding Redis caching via a decorated repository). The `pg/` adapter package keeps the domain root tidy as the pgx implementation and its integration tests grow.
 
 ## Custom migration runner (2026-07-20)
 

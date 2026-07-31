@@ -15,9 +15,13 @@ Every business domain is a **top-level package** under `internal/domain/`. Each 
 internal/domain/{domainName}/
 ├── entity.go          — Domain struct (no JSON tags on internal fields)
 ├── repository.go      — Repository interface (methods the service needs)
-├── repository_pg.go   — pgx implementation of the repository
 ├── service.go         — Business logic (calls repository interface)
-└── handler.go         — HTTP handlers + route registration
+├── handler.go         — HTTP handlers + route registration
+├── mocks/             — Mockery-generated test mocks (test-only)
+└── pg/                — PostgreSQL adapter package
+    ├── {adapter}.go   — pgx implementation(s) of the repository
+    ├── helper_test.go — shared container setup for integration tests
+    └── repository_integration_test.go — integration tests (build tag `integration`)
 ```
 
 ### Optional files
@@ -55,22 +59,23 @@ type Repository interface {
 }
 ```
 
-### repository_pg.go
+### pg/ (PostgreSQL adapter)
 
-Implement the repository using `pgx`. Constructor takes `*pgxpool.Pool`.
+Implement the repository with `pgx` in a `pg/` subpackage. Name the file after the adapter it implements: `repository.go` for a `Repository`, `users.go` / `sessions.go` for `UsersRepository` / `SessionsRepository`. Types drop the `PG` suffix — the package already says it.
 
 ```go
-type RepositoryPG struct {
+type Repository struct {
     pool *pgxpool.Pool
 }
 
-func NewRepository(pool *pgxpool.Pool) *RepositoryPG {
-    return &RepositoryPG{pool: pool}
+func NewRepository(pool *pgxpool.Pool) *Repository {
+    return &Repository{pool: pool}
 }
 ```
 
 - Use `pgx.ErrNoRows` for missing records → return `nil, nil`.
 - Wrap all errors with context: `fmt.Errorf("method name: %w", err)`.
+- Consumers wire it as `pg.NewRepository(pool)`. When a file imports more than one domain's `pg` package, alias the imports (e.g. `userpg`, `beritapg`).
 
 ### service.go
 
@@ -152,7 +157,7 @@ func NewRouter(ah *auth.Handler, uh *user.Handler, bh *berita.Handler, authMw fu
 All dependencies are wired in `cmd/server/main.go`:
 
 ```go
-repo := domain.NewRepository(pool)
+repo := domainpg.NewRepository(pool)
 svc  := domain.NewService(repo)
 hnd  := domain.NewHandler(svc)
 ```
@@ -166,10 +171,10 @@ Order: repository depends on pool → service depends on repository → handler 
 | Directory | `internal/domain/{name}` | `internal/domain/auth` |
 | Entity struct | PascalCase singular | `type User struct` |
 | Repository interface | `Repository` | `type Repository interface` |
-| PG implementation | `RepositoryPG` | `type RepositoryPG struct` |
+| PG implementation (in `pg/`) | `Repository` / `UsersRepository` | `type Repository struct` in `internal/domain/{name}/pg/` |
 | Service | `Service` | `type Service struct` |
 | Handler | `Handler` | `type Handler struct` |
-| Constructor | `New{Type}` | `func NewRepository(pool *pgxpool.Pool) *RepositoryPG` |
+| Constructor | `New{Type}` | `func NewRepository(pool *pgxpool.Pool) *Repository` |
 | Handler methods | `List`, `Create`, `Get`, `Update`, `Delete` | `func (h *Handler) List` |
 | Input types | `{Action}{Domain}Input` | `CreateUserInput` |
 

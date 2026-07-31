@@ -39,11 +39,11 @@ type User struct {
 
 ```
 GET /api/v1/users
-  → handler.List → service.List → repository_pg.List (SELECT without password_hash)
+  → handler.List → service.List → pg.List (SELECT without password_hash)
 
 PUT /api/v1/users/{id}/role
   → handler.UpdateRole → service.UpdateRole (validates role is one of: jurnal, guru, admin, user)
-    → repository_pg.UpdateRole (UPDATE users SET role = $2)
+    → pg.UpdateRole (UPDATE users SET role = $2)
 ```
 
 ## Rules
