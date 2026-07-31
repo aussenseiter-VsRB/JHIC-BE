@@ -44,7 +44,7 @@ A change that spans layers (e.g. a new endpoint that validates, queries, and wri
    - Keep the connection-leak assertion: record `pool.Stat().AcquiredConns()` before and assert it returns to baseline after.
    - For storage round-trips: `Upload` → object exists → `PresignGet` → signed URL fetchable → `Delete` → object gone.
 
-5. **Schema changes.** If the feature needs a new table or column, add a new file `cmd/server/migrations/00X_name.sql`. Do not edit existing migrations. Both the integration and E2E suites apply all migrations on container start, so no test code changes are required for the schema itself.
+5. **Schema changes.** Prefer zero-schema changes. When a new table or column is unavoidable and the target environment has **not** yet run the original migration (anything except production), **edit the original CREATE migration in place** — `cmd/server/migrations/00X_name.sql` — and update every dependent file in the same commit: pg adapter queries, entity structs, integration tests, E2E tests, docs. Do **not** create an ALTER TABLE migration for pre-production. New numbered `00X_*.sql` files are reserved for environments that already ran the original migration (production) and for data backfills. The runner records applied versions in `schema_migrations` keyed by version number, so an in-place edit is skipped on any DB that already applied the old file.
 
 6. **E2E API tests.** Extend or add `TestE2E_*` in `internal/e2e/e2e_test.go`. Drive a real HTTP request through the real router, then **confirm permanent state changes** by querying the database or storage directly (row exists / updated / deleted, session invalidated, object stored / removed). Reuse the existing helpers (`register`, `doJSON`, `uploadImage`, `promoteToJurnal`).
 
@@ -72,6 +72,6 @@ A feature is not "tested" until all of the following hold:
 - [ ] `go test -race ./...` passes.
 - [ ] Mocks regenerated and expectations updated when `repository.go` interfaces changed.
 - [ ] No sleeps or polling hacks; no `t.Parallel()` on tests sharing schema/state.
-- [ ] New migrations follow `00X_*.sql` numbering; existing migrations untouched.
+- [ ] Pre-production schema changes edit the original CREATE migration in place with all dependent files updated in the same commit; new numbered `00X_*.sql` files only for production and data backfills.
 - [ ] No dead test code — every helper added is used, every test asserts something.
 - [ ] Domain docs updated if behavior changed.

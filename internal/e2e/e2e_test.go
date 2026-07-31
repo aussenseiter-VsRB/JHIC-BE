@@ -9,6 +9,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
@@ -67,6 +69,11 @@ func promoteToJurnal(t *testing.T, e *env, userID id.ID) {
 
 func uploadImage(t *testing.T, url, token string) *http.Response {
 	t.Helper()
+	return uploadPNG(t, url, token)
+}
+
+func uploadPNG(t *testing.T, target, token string) *http.Response {
+	t.Helper()
 	png := make([]byte, 600)
 	copy(png, "\x89PNG\r\n\x1a\n")
 
@@ -78,13 +85,45 @@ func uploadImage(t *testing.T, url, token string) *http.Response {
 	require.NoError(t, err)
 	require.NoError(t, mw.Close())
 
-	req, err := http.NewRequest(http.MethodPost, url, &buf)
+	req, err := http.NewRequest(http.MethodPost, target, &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	return resp
+}
+
+func assertObjectExists(t *testing.T, e *env, key string) []byte {
+	t.Helper()
+	obj, err := e.verifyS3.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(testBucket),
+		Key:    aws.String(key),
+	})
+	require.NoError(t, err)
+	data, err := io.ReadAll(obj.Body)
+	require.NoError(t, err)
+	obj.Body.Close()
+	return data
+}
+
+func assertObjectMissing(t *testing.T, e *env, key string) {
+	t.Helper()
+	_, err := e.verifyS3.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(testBucket),
+		Key:    aws.String(key),
+	})
+	var noSuchKey *types.NoSuchKey
+	require.ErrorAs(t, err, &noSuchKey)
+}
+
+func extractImageRef(t *testing.T, content string) string {
+	t.Helper()
+	start := strings.Index(content, "](")
+	require.GreaterOrEqual(t, start, 0)
+	end := strings.Index(content[start+2:], ")")
+	require.GreaterOrEqual(t, end, 0)
+	return content[start+2 : start+2+end]
 }
 
 func TestE2E_Register_PersistsUserAndSession(t *testing.T) {
@@ -263,6 +302,69 @@ func TestE2E_BeritaLifecycle(t *testing.T) {
 	require.Equal(t, http.StatusOK, signedResp.StatusCode)
 	require.Equal(t, png, signed)
 
+	inlineResp := uploadImage(t, baseURL+"/"+created.ID.String()+"/images", token)
+	require.Equal(t, http.StatusOK, inlineResp.StatusCode)
+	var inlineOut struct {
+		ImageURL string `json:"image_url"`
+	}
+	require.NoError(t, json.NewDecoder(inlineResp.Body).Decode(&inlineOut))
+	inlineResp.Body.Close()
+	require.NotEmpty(t, inlineOut.ImageURL)
+	require.True(t, strings.HasPrefix(inlineOut.ImageURL, "berita/"+created.ID.String()+"/content/"))
+	require.NotContains(t, inlineOut.ImageURL, "://")
+
+	inlineData := assertObjectExists(t, e, inlineOut.ImageURL)
+	require.Equal(t, png, inlineData)
+
+	markdownContent := "# Heading\n\nFirst paragraph.\n\n![photo](" + inlineOut.ImageURL + ")\n\nSecond paragraph."
+	updateResp = doJSON(t, http.MethodPut, baseURL+"/"+created.ID.String(), token, map[string]string{
+		"title":   "Updated News",
+		"content": markdownContent,
+	})
+	require.Equal(t, http.StatusOK, updateResp.StatusCode)
+	updateResp.Body.Close()
+
+	err = e.pool.QueryRow(ctx, `SELECT content FROM berita WHERE id = $1`, created.ID).Scan(&dbContent)
+	require.NoError(t, err)
+	require.Contains(t, dbContent, inlineOut.ImageURL)
+	require.NotContains(t, dbContent, "://")
+
+	getResp = doJSON(t, http.MethodGet, baseURL+"/"+created.ID.String(), token, nil)
+	require.Equal(t, http.StatusOK, getResp.StatusCode)
+	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
+	getResp.Body.Close()
+	signedRef := extractImageRef(t, got.Content)
+	require.True(t, strings.HasPrefix(signedRef, "http"))
+	require.Contains(t, signedRef, inlineOut.ImageURL)
+
+	inlineSignedResp, err := http.Get(signedRef)
+	require.NoError(t, err)
+	inlineSigned, err := io.ReadAll(inlineSignedResp.Body)
+	require.NoError(t, err)
+	inlineSignedResp.Body.Close()
+	require.Equal(t, http.StatusOK, inlineSignedResp.StatusCode)
+	require.Equal(t, png, inlineSigned)
+
+	delImgResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID.String()+"/images?key="+url.QueryEscape(inlineOut.ImageURL), token, nil)
+	require.Equal(t, http.StatusNoContent, delImgResp.StatusCode)
+	delImgResp.Body.Close()
+	assertObjectMissing(t, e, inlineOut.ImageURL)
+
+	keepResp := uploadImage(t, baseURL+"/"+created.ID.String()+"/images", token)
+	require.Equal(t, http.StatusOK, keepResp.StatusCode)
+	var keepOut struct {
+		ImageURL string `json:"image_url"`
+	}
+	require.NoError(t, json.NewDecoder(keepResp.Body).Decode(&keepOut))
+	keepResp.Body.Close()
+	assertObjectExists(t, e, keepOut.ImageURL)
+	updateResp = doJSON(t, http.MethodPut, baseURL+"/"+created.ID.String(), token, map[string]string{
+		"title":   "Updated News",
+		"content": "Body with ![inline](" + keepOut.ImageURL + ")",
+	})
+	require.Equal(t, http.StatusOK, updateResp.StatusCode)
+	updateResp.Body.Close()
+
 	deleteResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID.String(), token, nil)
 	require.Equal(t, http.StatusNoContent, deleteResp.StatusCode)
 	deleteResp.Body.Close()
@@ -272,12 +374,8 @@ func TestE2E_BeritaLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	_, err = e.verifyS3.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(testBucket),
-		Key:    aws.String(rawImagePath),
-	})
-	var noSuchKey *types.NoSuchKey
-	require.ErrorAs(t, err, &noSuchKey)
+	assertObjectMissing(t, e, rawImagePath)
+	assertObjectMissing(t, e, keepOut.ImageURL)
 }
 
 func TestE2E_RoleAndAuthorization(t *testing.T) {
@@ -317,6 +415,18 @@ func TestE2E_RoleAndAuthorization(t *testing.T) {
 	deleteResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID.String(), otherToken, nil)
 	require.Equal(t, http.StatusForbidden, deleteResp.StatusCode)
 	deleteResp.Body.Close()
+
+	imgResp := uploadImage(t, baseURL+"/"+created.ID.String()+"/images", otherToken)
+	require.Equal(t, http.StatusForbidden, imgResp.StatusCode)
+	imgResp.Body.Close()
+
+	delImgResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID.String()+"/images?key="+url.QueryEscape("berita/"+created.ID.String()+"/content/abc.png"), otherToken, nil)
+	require.Equal(t, http.StatusForbidden, delImgResp.StatusCode)
+	delImgResp.Body.Close()
+
+	badKeyResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID.String()+"/images?key="+url.QueryEscape("berita/"+created.ID.String()+"/cover.png"), token, nil)
+	require.Equal(t, http.StatusBadRequest, badKeyResp.StatusCode)
+	badKeyResp.Body.Close()
 
 	missingResp := doJSON(t, http.MethodGet, baseURL+"/999999999999999999", token, nil)
 	require.Equal(t, http.StatusNotFound, missingResp.StatusCode)

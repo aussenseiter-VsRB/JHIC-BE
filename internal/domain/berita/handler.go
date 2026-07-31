@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,6 +36,8 @@ func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 	mux.Handle("PUT /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Update))))
 	mux.Handle("DELETE /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Delete))))
 	mux.Handle("POST /api/v1/berita/{id}/image", authMw(roleMw(http.HandlerFunc(h.UploadImage))))
+	mux.Handle("POST /api/v1/berita/{id}/images", authMw(roleMw(http.HandlerFunc(h.UploadContentImage))))
+	mux.Handle("DELETE /api/v1/berita/{id}/images", authMw(roleMw(http.HandlerFunc(h.DeleteContentImage))))
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -48,17 +51,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if input.Title == "" || input.Content == "" {
-		response.Error(w, http.StatusBadRequest, "title and content are required")
+	if input.Title == "" {
+		response.Error(w, http.StatusBadRequest, "title is required")
+		return
+	}
+	content, err := normalizeImageRefs(input.Content)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid content")
 		return
 	}
 
-	b, err := h.svc.Create(r.Context(), userID, input.Title, input.Content)
+	b, err := h.svc.Create(r.Context(), userID, input.Title, content)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		h.writeServiceError(w, err)
 		return
 	}
-	h.signImageURL(r.Context(), b)
+	h.signArticle(r.Context(), b)
 	response.JSON(w, http.StatusCreated, b)
 }
 
@@ -69,7 +77,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range list {
-		h.signImageURL(r.Context(), &list[i])
+		h.signArticle(r.Context(), &list[i])
 	}
 	response.JSON(w, http.StatusOK, list)
 }
@@ -89,7 +97,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusNotFound, "berita not found")
 		return
 	}
-	h.signImageURL(r.Context(), b)
+	h.signArticle(r.Context(), b)
 	response.JSON(w, http.StatusOK, b)
 }
 
@@ -109,20 +117,18 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-
-	b, err := h.svc.Update(r.Context(), id, userID, input.Title, input.Content)
+	content, err := normalizeImageRefs(input.Content)
 	if err != nil {
-		switch err.Error() {
-		case "berita not found":
-			response.Error(w, http.StatusNotFound, err.Error())
-		case "forbidden: not the author":
-			response.Error(w, http.StatusForbidden, err.Error())
-		default:
-			response.Error(w, http.StatusInternalServerError, err.Error())
-		}
+		response.Error(w, http.StatusBadRequest, "invalid content")
 		return
 	}
-	h.signImageURL(r.Context(), b)
+
+	b, err := h.svc.Update(r.Context(), id, userID, input.Title, content)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	h.signArticle(r.Context(), b)
 	response.JSON(w, http.StatusOK, b)
 }
 
@@ -144,25 +150,13 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if b.ImageURL != "" {
-		path := b.ImageURL
-		if strings.Contains(path, "://") {
-			if p, err := extractObjectPath(path); err == nil {
-				path = p
-			}
-		}
-		_ = h.store.Delete(r.Context(), path)
+	h.deleteObject(r.Context(), b.ImageURL)
+	for _, key := range extractImageKeys(b.Content) {
+		h.deleteObject(r.Context(), key)
 	}
 
 	if err := h.svc.Delete(r.Context(), id, userID); err != nil {
-		switch err.Error() {
-		case "berita not found":
-			response.Error(w, http.StatusNotFound, err.Error())
-		case "forbidden: not the author":
-			response.Error(w, http.StatusForbidden, err.Error())
-		default:
-			response.Error(w, http.StatusInternalServerError, err.Error())
-		}
+		h.writeServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -176,23 +170,104 @@ func (h *Handler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	objectPath, ok := h.uploadImage(w, r, fmt.Sprintf("berita/%s", beritaID))
+	if !ok {
+		return
+	}
+
+	b, err := h.svc.SetImage(r.Context(), beritaID, userID, objectPath)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	h.signArticle(r.Context(), b)
+	response.JSON(w, http.StatusOK, map[string]string{"image_url": b.ImageURL})
+}
+
+func (h *Handler) UploadContentImage(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
+	beritaID, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	b, err := h.svc.ByID(r.Context(), beritaID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if b == nil {
+		response.Error(w, http.StatusNotFound, "berita not found")
+		return
+	}
+	if b.AuthorID != userID {
+		response.Error(w, http.StatusForbidden, "forbidden: not the author")
+		return
+	}
+
+	objectPath, ok := h.uploadImage(w, r, fmt.Sprintf("berita/%s/content", beritaID))
+	if !ok {
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]string{"image_url": objectPath})
+}
+
+func (h *Handler) DeleteContentImage(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
+	beritaID, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	key := r.URL.Query().Get("key")
+	if !isValidContentKey(beritaID, key) {
+		response.Error(w, http.StatusBadRequest, "invalid key")
+		return
+	}
+
+	b, err := h.svc.ByID(r.Context(), beritaID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if b == nil {
+		response.Error(w, http.StatusNotFound, "berita not found")
+		return
+	}
+	if b.AuthorID != userID {
+		response.Error(w, http.StatusForbidden, "forbidden: not the author")
+		return
+	}
+
+	if err := h.store.Delete(r.Context(), key); err != nil {
+		response.Error(w, http.StatusInternalServerError, "failed to delete image")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) uploadImage(w http.ResponseWriter, r *http.Request, prefix string) (string, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	if err := r.ParseMultipartForm(5 << 20); err != nil {
 		response.Error(w, http.StatusBadRequest, "file too large or invalid multipart form")
-		return
+		return "", false
 	}
 
 	file, header, err := r.FormFile("image")
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "missing image field")
-		return
+		return "", false
 	}
 	defer file.Close()
 
 	buf := make([]byte, 512)
 	if _, err := file.Read(buf); err != nil {
 		response.Error(w, http.StatusInternalServerError, "failed to read image")
-		return
+		return "", false
 	}
 	file.Seek(0, io.SeekStart)
 
@@ -205,7 +280,7 @@ func (h *Handler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 	if !allowed[detected] {
 		response.Error(w, http.StatusBadRequest, "unsupported image type: jpeg, png, gif, webp allowed")
-		return
+		return "", false
 	}
 
 	ext := filepath.Ext(header.Filename)
@@ -223,31 +298,21 @@ func (h *Handler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	uuid := make([]byte, 16)
 	if _, err := rand.Read(uuid); err != nil {
 		response.Error(w, http.StatusInternalServerError, "failed to generate unique id")
-		return
+		return "", false
 	}
-	objectPath := fmt.Sprintf("berita/%s/%s%s", beritaID, hex.EncodeToString(uuid), strings.ToLower(ext))
+	objectPath := fmt.Sprintf("%s/%s%s", prefix, hex.EncodeToString(uuid), strings.ToLower(ext))
 
-	imageURL, err := h.store.Upload(r.Context(), objectPath, detected, file)
-	if err != nil {
+	if _, err := h.store.Upload(r.Context(), objectPath, detected, file); err != nil {
 		response.Error(w, http.StatusInternalServerError, "failed to upload image")
-		return
+		return "", false
 	}
 
-	b, err := h.svc.SetImage(r.Context(), beritaID, userID, imageURL)
-	if err != nil {
-		switch err.Error() {
-		case "berita not found":
-			response.Error(w, http.StatusNotFound, err.Error())
-		case "forbidden: not the author":
-			response.Error(w, http.StatusForbidden, err.Error())
-		default:
-			response.Error(w, http.StatusInternalServerError, err.Error())
-		}
-		return
-	}
+	return objectPath, true
+}
 
-	h.signImageURL(r.Context(), b)
-	response.JSON(w, http.StatusOK, map[string]string{"image_url": b.ImageURL})
+func (h *Handler) signArticle(ctx context.Context, b *Berita) {
+	h.signImageURL(ctx, b)
+	b.Content = h.signContent(ctx, b.Content)
 }
 
 func (h *Handler) signImageURL(ctx context.Context, b *Berita) {
@@ -260,6 +325,48 @@ func (h *Handler) signImageURL(ctx context.Context, b *Berita) {
 		return
 	}
 	b.ImageURL = signed
+}
+
+func (h *Handler) signContent(ctx context.Context, content string) string {
+	return resolveImageRefs(content, func(key string) (string, error) {
+		return h.store.PresignGet(ctx, key, 24*time.Hour)
+	})
+}
+
+func (h *Handler) deleteObject(ctx context.Context, objectPath string) {
+	if objectPath == "" {
+		return
+	}
+	if strings.Contains(objectPath, "://") {
+		if p, err := extractObjectPath(objectPath); err == nil {
+			objectPath = p
+		}
+	}
+	_ = h.store.Delete(ctx, objectPath)
+}
+
+func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrContentRequired), errors.Is(err, ErrContentTooLarge):
+		response.Error(w, http.StatusBadRequest, err.Error())
+	case err.Error() == "berita not found":
+		response.Error(w, http.StatusNotFound, err.Error())
+	case err.Error() == "forbidden: not the author":
+		response.Error(w, http.StatusForbidden, err.Error())
+	default:
+		response.Error(w, http.StatusInternalServerError, err.Error())
+	}
+}
+
+func isValidContentKey(beritaID id.ID, key string) bool {
+	if key == "" || strings.ContainsAny(key, "\n\r\t ") {
+		return false
+	}
+	if strings.Contains(key, "://") || strings.HasPrefix(key, "/") || strings.ContainsAny(key, "?") || strings.Contains(key, "..") {
+		return false
+	}
+	prefix := fmt.Sprintf("berita/%s/content/", beritaID)
+	return strings.HasPrefix(key, prefix) && len(key) > len(prefix)
 }
 
 func extractObjectPath(imageURL string) (string, error) {

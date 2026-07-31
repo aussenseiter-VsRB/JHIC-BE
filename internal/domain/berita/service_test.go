@@ -3,6 +3,7 @@ package berita_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
@@ -87,6 +88,20 @@ func TestService_Create(t *testing.T) {
 		require.Equal(t, "News", got.Title)
 	})
 
+	t.Run("empty content rejected", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+		svc := berita.NewService(repo)
+		_, err := svc.Create(context.Background(), id.ID(10), "News", "   ")
+		require.ErrorIs(t, err, berita.ErrContentRequired)
+	})
+
+	t.Run("content too large rejected", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+		svc := berita.NewService(repo)
+		_, err := svc.Create(context.Background(), id.ID(10), "News", strings.Repeat("x", 100*1024+1))
+		require.ErrorIs(t, err, berita.ErrContentTooLarge)
+	})
+
 	t.Run("repository error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
@@ -155,6 +170,20 @@ func TestService_Update(t *testing.T) {
 		svc := berita.NewService(repo)
 		_, err := svc.Update(context.Background(), id.ID(1), id.ID(10), "New", "Body")
 		require.EqualError(t, err, "update failed")
+	})
+
+	t.Run("empty content rejected", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+		svc := berita.NewService(repo)
+		_, err := svc.Update(context.Background(), id.ID(1), id.ID(10), "New", "")
+		require.ErrorIs(t, err, berita.ErrContentRequired)
+	})
+
+	t.Run("content too large rejected", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+		svc := berita.NewService(repo)
+		_, err := svc.Update(context.Background(), id.ID(1), id.ID(10), "New", strings.Repeat("x", 100*1024+1))
+		require.ErrorIs(t, err, berita.ErrContentTooLarge)
 	})
 }
 

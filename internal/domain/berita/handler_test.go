@@ -2,7 +2,39 @@ package berita
 
 import (
 	"testing"
+
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 )
+
+func TestIsValidContentKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		berita  id.ID
+		key     string
+		wantErr bool
+	}{
+		{name: "valid key", berita: id.ID(1), key: "berita/1/content/abc.png"},
+		{name: "nested content key", berita: id.ID(1), key: "berita/1/content/sub/abc.png"},
+		{name: "other berita rejected", berita: id.ID(1), key: "berita/2/content/abc.png", wantErr: true},
+		{name: "cover image rejected", berita: id.ID(1), key: "berita/1/abc.png", wantErr: true},
+		{name: "signed url rejected", berita: id.ID(1), key: "https://bucket/berita/1/content/abc.png", wantErr: true},
+		{name: "absolute path rejected", berita: id.ID(1), key: "/berita/1/content/abc.png", wantErr: true},
+		{name: "traversal rejected", berita: id.ID(1), key: "berita/1/content/../abc.png", wantErr: true},
+		{name: "query string rejected", berita: id.ID(1), key: "berita/1/content/abc.png?x=1", wantErr: true},
+		{name: "empty key rejected", berita: id.ID(1), key: "", wantErr: true},
+		{name: "key with space rejected", berita: id.ID(1), key: "berita/1/content/a b.png", wantErr: true},
+		{name: "content dir itself rejected", berita: id.ID(1), key: "berita/1/content/", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isValidContentKey(tt.berita, tt.key)
+			if (got) == tt.wantErr {
+				t.Errorf("isValidContentKey() = %v, wantErr = %v", got, tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestExtractObjectPath(t *testing.T) {
 	tests := []struct {

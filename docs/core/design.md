@@ -43,6 +43,12 @@ type: Enforce
 
 **Rationale:** `golang-migrate/migrate` requires driver registration and database/sql compatibility layers. A custom runner with `embed` or filesystem reads is ~60 lines, has zero extra dependencies, and is fully transparent. Down migrations are handled manually via SQL scripts when needed.
 
+## In-place CREATE migrations for pre-production (2026-07-31)
+
+**Decision:** Never create an ALTER TABLE migration file for environments that have not yet run the original CREATE migration. Instead, edit the original `00X_*.sql` file in place and change every dependent file in the same commit — pg adapter queries, entity structs, integration tests, E2E tests, docs. New numbered migration files are reserved for production (where the original migration already ran) and for data backfills.
+
+**Rationale:** The runner records applied versions in `schema_migrations` keyed by version number, so an edited file is applied only on databases that have never seen that version. Pre-production environments (local dev, CI, Testcontainers) rebuild the schema from scratch constantly, so editing the CREATE keeps a single authoritative migration per schema change, eliminates "CREATE followed immediately by ALTER" noise, and prevents the code, tests, and migration set from drifting apart. Production has the old file recorded as applied, so a new numbered migration is required there.
+
 ## Snowflake IDs (2026-07-31)
 
 **Decision:** Generate snowflake IDs client-side in Go (`internal/pkg/id/id.go`), stored as `BIGINT` in Postgres and serialized as decimal strings in JSON. The `id.ID` named type (int64) is used across entities, repositories, services, handlers, and middleware instead of `string`.

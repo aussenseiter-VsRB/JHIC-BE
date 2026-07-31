@@ -2,10 +2,19 @@ package berita
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
+)
+
+const maxContentBytes = 100 * 1024
+
+var (
+	ErrContentRequired = errors.New("content is required")
+	ErrContentTooLarge = errors.New("content exceeds the 100 KB limit")
 )
 
 type Service struct {
@@ -24,7 +33,20 @@ func (s *Service) ByID(ctx context.Context, id id.ID) (*Berita, error) {
 	return s.repo.ByID(ctx, id)
 }
 
+func validateContent(content string) error {
+	if strings.TrimSpace(content) == "" {
+		return ErrContentRequired
+	}
+	if len(content) > maxContentBytes {
+		return ErrContentTooLarge
+	}
+	return nil
+}
+
 func (s *Service) Create(ctx context.Context, authorID id.ID, title, content string) (*Berita, error) {
+	if err := validateContent(content); err != nil {
+		return nil, err
+	}
 	now := time.Now().UTC()
 	b := &Berita{
 		ID:        id.New(),
@@ -41,6 +63,9 @@ func (s *Service) Create(ctx context.Context, authorID id.ID, title, content str
 }
 
 func (s *Service) Update(ctx context.Context, id, callerID id.ID, title, content string) (*Berita, error) {
+	if err := validateContent(content); err != nil {
+		return nil, err
+	}
 	b, err := s.repo.ByID(ctx, id)
 	if err != nil {
 		return nil, err
