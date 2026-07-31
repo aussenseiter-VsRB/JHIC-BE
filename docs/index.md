@@ -15,6 +15,7 @@ docs/
 │   ├── systemDesign.md     — Architecture and system design
 │   ├── design.md           — Design decisions and rationale
 │   ├── codingPrinciple.md  — Code standards and conventions
+│   ├── testingRules.md     — Unit, component integration, and E2E API test rules
 │   └── SKILLS.md           — Agent skills and subagent reference
 └── modules/                # Domain patterns (Enforce rules + editable docs)
     ├── RULES.md            — Domain creation rules (Enforce)
@@ -31,6 +32,7 @@ docs/
 - All `type: Enforce`. Read these before any architectural or coding decisions.
 - `systemDesign.md` takes precedence over all other docs for architecture questions.
 - `design.md` records past decisions — do not contradict them without updating the file.
+- `testingRules.md` governs all test code — read it before writing or modifying any test.
 
 ### docs/modules/
 
