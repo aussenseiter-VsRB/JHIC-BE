@@ -15,6 +15,8 @@ import (
 	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 	beritapg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita/pg"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
+	pklpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	userpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
@@ -139,6 +141,10 @@ func TestMain(m *testing.M) {
 	beritaSvc := berita.NewService(beritaRepo)
 	beritaHnd := berita.NewHandler(beritaSvc, store)
 
+	pklRepo := pklpg.NewRepository(pool)
+	pklSvc := pkl.NewService(pklRepo, userRepo)
+	pklHnd := pkl.NewHandler(pklSvc)
+
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
 	roleChecker := func(ctx context.Context, userID string) (string, error) {
@@ -153,7 +159,7 @@ func TestMain(m *testing.M) {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, authMw, roleMw)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, authMw, roleMw, roleChecker)
 	server := httptest.NewServer(router)
 
 	testEnv = &env{server: server, pool: pool, store: store, verifyS3: verifyS3}
@@ -168,7 +174,13 @@ func TestMain(m *testing.M) {
 
 func startE2E(t *testing.T) *env {
 	t.Helper()
-	_, err := testEnv.pool.Exec(context.Background(), `TRUNCATE sessions, berita, users CASCADE`)
+	_, err := testEnv.pool.Exec(context.Background(), `TRUNCATE pkl_approval_steps, pkl_requests, sessions, berita, users CASCADE`)
 	require.NoError(t, err)
 	return testEnv
+}
+
+func promoteToAdmin(t *testing.T, e *env, userID string) {
+	t.Helper()
+	_, err := e.pool.Exec(context.Background(), `UPDATE users SET role = 'admin' WHERE id = $1`, userID)
+	require.NoError(t, err)
 }

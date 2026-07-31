@@ -7,6 +7,8 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
 )
 
+const RoleKey contextKey = "role"
+
 type RoleChecker func(ctx context.Context, userID string) (string, error)
 
 func RequireRole(allowedRoles ...string) func(RoleChecker) func(http.Handler) http.Handler {
@@ -27,7 +29,8 @@ func RequireRole(allowedRoles ...string) func(RoleChecker) func(http.Handler) ht
 
 				for _, allowed := range allowedRoles {
 					if role == allowed {
-						next.ServeHTTP(w, r)
+						ctx := context.WithValue(r.Context(), RoleKey, role)
+						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
 				}

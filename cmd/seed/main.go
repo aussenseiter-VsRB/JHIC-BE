@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
@@ -19,6 +20,9 @@ type seedUser struct {
 	password string
 	name     string
 	role     string
+	class    string
+	jurusan  string
+	position string
 }
 
 type seedBerita struct {
@@ -50,7 +54,34 @@ func main() {
 		{email: "admin@jhic.com", password: "admin123", name: "Admin User", role: "admin"},
 		{email: "jurnal@jhic.com", password: "jurnal123", name: "Jurnalis User", role: "jurnal"},
 		{email: "user@jhic.com", password: "user123", name: "Regular User", role: "user"},
+		{email: "siswa-pplg1@jhic.com", password: "siswa123", name: "Siswa PPLG 1", role: "user", class: "PPLG 1", jurusan: "PPLG"},
 	}
+
+	for _, jurusan := range []string{"PPLG", "AK", "HTL"} {
+		for i := 1; i <= jurusanClasses(jurusan); i++ {
+			class := fmt.Sprintf("%s %d", jurusan, i)
+			users = append(users, seedUser{
+				email:    slugify(class) + "@jhic.com",
+				password: "guru123",
+				name:     "Wali Kelas " + class,
+				role:     "guru",
+				class:    class,
+				position: "wali_kelas",
+			})
+		}
+		users = append(users, seedUser{
+			email:    "kaprog-" + jurusan + "@jhic.com",
+			password: "guru123",
+			name:     "Kaprog " + jurusan,
+			role:     "guru",
+			jurusan:  jurusan,
+			position: "kaprog",
+		})
+	}
+	users = append(users,
+		seedUser{email: "bk@jhic.com", password: "guru123", name: "Guru BK", role: "guru", position: "bk"},
+		seedUser{email: "kesiswaan@jhic.com", password: "guru123", name: "Guru Kesiswaan", role: "guru", position: "kesiswaan"},
+	)
 
 	var userIDs []string
 	for _, u := range users {
@@ -61,16 +92,16 @@ func main() {
 		}
 		now := time.Now().UTC()
 		_, err = pool.Exec(ctx,
-			`INSERT INTO users (id, email, password_hash, name, role, avatar_url, created_at, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, '', $6, $7)
-			 ON CONFLICT (email) DO UPDATE SET name = $4, role = $5, password_hash = $3, updated_at = $7`,
-			uid, u.email, string(hash), u.name, u.role, now, now,
+			`INSERT INTO users (id, email, password_hash, name, role, class, jurusan, position, avatar_url, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '', $9, $10)
+			 ON CONFLICT (email) DO UPDATE SET name = $4, role = $5, class = $6, jurusan = $7, position = $8, password_hash = $3, updated_at = $10`,
+			uid, u.email, string(hash), u.name, u.role, u.class, u.jurusan, u.position, now, now,
 		)
 		if err != nil {
 			log.Fatalf("insert user %s: %v", u.email, err)
 		}
 		userIDs = append(userIDs, uid)
-		fmt.Printf("user: %s / %s (%s)\n", u.email, u.password, uid)
+		fmt.Printf("user: %s / %s (%s) [%s %s %s]\n", u.email, u.password, uid, u.role, u.class, u.position)
 	}
 
 	for _, uid := range userIDs {
@@ -110,6 +141,22 @@ func main() {
 	}
 
 	fmt.Println("\nseed complete")
+}
+
+func jurusanClasses(jurusan string) int {
+	switch jurusan {
+	case "PPLG":
+		return 3
+	case "AK":
+		return 2
+	case "HTL":
+		return 5
+	}
+	return 0
+}
+
+func slugify(s string) string {
+	return strings.ToLower(strings.ReplaceAll(s, " ", "-"))
 }
 
 func init() {

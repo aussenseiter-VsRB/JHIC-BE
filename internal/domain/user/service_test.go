@@ -77,14 +77,27 @@ func TestService_Update(t *testing.T) {
 		existing := &user.User{ID: "u1", Email: "a@example.com", Name: "Old", AvatarURL: ""}
 		repo.On("ByID", mock.Anything, "u1").Return(existing, nil)
 		repo.On("Update", mock.Anything, mock.MatchedBy(func(u *user.User) bool {
-			return u.ID == "u1" && u.Name == "New" && u.AvatarURL == "https://cdn.example.com/a.png" && !u.UpdatedAt.IsZero()
+			return u.ID == "u1" && u.Name == "New" && u.AvatarURL == "https://cdn.example.com/a.png" &&
+				u.Class == "PPLG 1" && u.Jurusan == "PPLG" && u.Position == "" && !u.UpdatedAt.IsZero()
 		})).Return(nil)
 
 		svc := user.NewService(repo)
-		got, err := svc.Update(context.Background(), "u1", "New", "https://cdn.example.com/a.png")
+		got, err := svc.Update(context.Background(), "u1", "New", "https://cdn.example.com/a.png", "PPLG 1", "PPLG", "")
 		require.NoError(t, err)
 		require.Equal(t, "New", got.Name)
 		require.Equal(t, "https://cdn.example.com/a.png", got.AvatarURL)
+		require.Equal(t, "PPLG 1", got.Class)
+	})
+
+	t.Run("position only valid for guru", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+
+		existing := &user.User{ID: "u1", Role: "user"}
+		repo.On("ByID", mock.Anything, "u1").Return(existing, nil)
+
+		svc := user.NewService(repo)
+		_, err := svc.Update(context.Background(), "u1", "New", "", "", "", "wali_kelas")
+		require.EqualError(t, err, "position is only valid for role guru")
 	})
 
 	t.Run("user not found", func(t *testing.T) {
@@ -93,7 +106,7 @@ func TestService_Update(t *testing.T) {
 		repo.On("ByID", mock.Anything, "missing").Return((*user.User)(nil), nil)
 
 		svc := user.NewService(repo)
-		_, err := svc.Update(context.Background(), "missing", "New", "")
+		_, err := svc.Update(context.Background(), "missing", "New", "", "", "", "")
 		require.EqualError(t, err, "user not found")
 	})
 
@@ -103,7 +116,7 @@ func TestService_Update(t *testing.T) {
 		repo.On("ByID", mock.Anything, "u1").Return((*user.User)(nil), errors.New("db down"))
 
 		svc := user.NewService(repo)
-		_, err := svc.Update(context.Background(), "u1", "New", "")
+		_, err := svc.Update(context.Background(), "u1", "New", "", "", "", "")
 		require.EqualError(t, err, "db down")
 	})
 
@@ -115,8 +128,78 @@ func TestService_Update(t *testing.T) {
 		repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update failed"))
 
 		svc := user.NewService(repo)
-		_, err := svc.Update(context.Background(), "u1", "New", "")
+		_, err := svc.Update(context.Background(), "u1", "New", "", "", "", "")
 		require.EqualError(t, err, "update failed")
+	})
+}
+
+func TestService_Create(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+
+		repo.On("ByEmail", mock.Anything, "guru@example.com").Return((*user.User)(nil), nil)
+		repo.On("Create", mock.Anything, mock.MatchedBy(func(u *user.User) bool {
+			return u.Email == "guru@example.com" && u.Role == "guru" && u.Position == "wali_kelas" && u.Class == "PPLG 1" && !u.CreatedAt.IsZero()
+		}), mock.MatchedBy(func(h string) bool { return len(h) > 0 })).Return(nil)
+
+		svc := user.NewService(repo)
+		got, err := svc.Create(context.Background(), "guru@example.com", "secret", "Bu Guru", "guru", "PPLG 1", "PPLG", "wali_kelas")
+		require.NoError(t, err)
+		require.Equal(t, "guru", got.Role)
+		require.Equal(t, "wali_kelas", got.Position)
+	})
+
+	t.Run("missing email or password", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+
+		svc := user.NewService(repo)
+		_, err := svc.Create(context.Background(), "", "", "Name", "user", "", "", "")
+		require.EqualError(t, err, "email and password are required")
+	})
+
+	t.Run("invalid role", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+
+		svc := user.NewService(repo)
+		_, err := svc.Create(context.Background(), "a@example.com", "secret", "Name", "superuser", "", "", "")
+		require.EqualError(t, err, "invalid role: must be one of [jurnal guru admin user]")
+	})
+
+	t.Run("invalid position", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+
+		svc := user.NewService(repo)
+		_, err := svc.Create(context.Background(), "a@example.com", "secret", "Name", "guru", "", "", "kepsek")
+		require.EqualError(t, err, "invalid position: must be one of [wali_kelas bk kesiswaan kaprog]")
+	})
+
+	t.Run("position only valid for guru", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+
+		svc := user.NewService(repo)
+		_, err := svc.Create(context.Background(), "a@example.com", "secret", "Name", "user", "", "", "bk")
+		require.EqualError(t, err, "position is only valid for role guru")
+	})
+
+	t.Run("duplicate email", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+
+		repo.On("ByEmail", mock.Anything, "a@example.com").Return(&user.User{ID: "u1"}, nil)
+
+		svc := user.NewService(repo)
+		_, err := svc.Create(context.Background(), "a@example.com", "secret", "Name", "user", "", "", "")
+		require.EqualError(t, err, "user with email a@example.com already exists")
+	})
+
+	t.Run("create error", func(t *testing.T) {
+		repo := mocks.NewRepository(t)
+
+		repo.On("ByEmail", mock.Anything, "a@example.com").Return((*user.User)(nil), nil)
+		repo.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("create failed"))
+
+		svc := user.NewService(repo)
+		_, err := svc.Create(context.Background(), "a@example.com", "secret", "Name", "user", "", "", "")
+		require.EqualError(t, err, "create failed")
 	})
 }
 

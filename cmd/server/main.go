@@ -17,6 +17,8 @@ import (
 	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 	beritapg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita/pg"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
+	pklpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	userpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
@@ -69,6 +71,10 @@ func main() {
 	beritaSvc := berita.NewService(beritaRepo)
 	beritaHnd := berita.NewHandler(beritaSvc, b2Client)
 
+	pklRepo := pklpg.NewRepository(pool)
+	pklSvc := pkl.NewService(pklRepo, userRepo)
+	pklHnd := pkl.NewHandler(pklSvc)
+
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
 	roleCheck := userSvc.ByID
@@ -84,7 +90,7 @@ func main() {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, authMw, roleMw)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, authMw, roleMw, roleChecker)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),

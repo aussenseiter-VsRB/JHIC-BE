@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
 )
 
@@ -15,12 +16,17 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-func (h *Handler) Register(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/users", h.List)
-	mux.HandleFunc("GET /api/v1/users/{id}", h.Get)
-	mux.HandleFunc("PUT /api/v1/users/{id}", h.Update)
-	mux.HandleFunc("PUT /api/v1/users/{id}/role", h.UpdateRole)
-	mux.HandleFunc("DELETE /api/v1/users/{id}", h.Delete)
+func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Handler, roleCheck middleware.RoleChecker) {
+	adminMw := func(next http.Handler) http.Handler {
+		return authMw(middleware.RequireRole("admin")(roleCheck)(next))
+	}
+
+	mux.Handle("GET /api/v1/users", http.HandlerFunc(h.List))
+	mux.Handle("GET /api/v1/users/{id}", http.HandlerFunc(h.Get))
+	mux.Handle("POST /api/v1/users", adminMw(http.HandlerFunc(h.Create)))
+	mux.Handle("PUT /api/v1/users/{id}", adminMw(http.HandlerFunc(h.Update)))
+	mux.Handle("PUT /api/v1/users/{id}/role", adminMw(http.HandlerFunc(h.UpdateRole)))
+	mux.Handle("DELETE /api/v1/users/{id}", adminMw(http.HandlerFunc(h.Delete)))
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -46,17 +52,52 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, user)
 }
 
-func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name      string `json:"name"`
-		AvatarURL string `json:"avatar_url"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
+		Role     string `json:"role"`
+		Class    string `json:"class"`
+		Jurusan  string `json:"jurusan"`
+		Position string `json:"position"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	user, err := h.svc.Update(r.Context(), id, input.Name, input.AvatarURL)
+
+	u, err := h.svc.Create(r.Context(), input.Email, input.Password, input.Name, input.Role, input.Class, input.Jurusan, input.Position)
+	if err != nil {
+		switch err.Error() {
+		case "user with email " + input.Email + " already exists":
+			response.Error(w, http.StatusConflict, err.Error())
+		case "invalid role: must be one of [jurnal guru admin user]",
+			"invalid position: must be one of [wali_kelas bk kesiswaan kaprog]",
+			"position is only valid for role guru":
+			response.Error(w, http.StatusUnprocessableEntity, err.Error())
+		default:
+			response.Error(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	response.JSON(w, http.StatusCreated, u)
+}
+
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var input struct {
+		Name      string `json:"name"`
+		AvatarURL string `json:"avatar_url"`
+		Class     string `json:"class"`
+		Jurusan   string `json:"jurusan"`
+		Position  string `json:"position"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	user, err := h.svc.Update(r.Context(), id, input.Name, input.AvatarURL, input.Class, input.Jurusan, input.Position)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
 		return

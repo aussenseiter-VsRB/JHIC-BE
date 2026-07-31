@@ -74,6 +74,24 @@ func (_m *Repository) ByID(ctx context.Context, id string) (*user.User, error) {
 	return r0, r1
 }
 
+// Create provides a mock function with given fields: ctx, u, passwordHash
+func (_m *Repository) Create(ctx context.Context, u *user.User, passwordHash string) error {
+	ret := _m.Called(ctx, u, passwordHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Create")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *user.User, string) error); ok {
+		r0 = rf(ctx, u, passwordHash)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Delete provides a mock function with given fields: ctx, id
 func (_m *Repository) Delete(ctx context.Context, id string) error {
 	ret := _m.Called(ctx, id)
@@ -90,6 +108,36 @@ func (_m *Repository) Delete(ctx context.Context, id string) error {
 	}
 
 	return r0
+}
+
+// FindByPosition provides a mock function with given fields: ctx, position, class, jurusan
+func (_m *Repository) FindByPosition(ctx context.Context, position string, class string, jurusan string) (*user.User, error) {
+	ret := _m.Called(ctx, position, class, jurusan)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByPosition")
+	}
+
+	var r0 *user.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*user.User, error)); ok {
+		return rf(ctx, position, class, jurusan)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *user.User); ok {
+		r0 = rf(ctx, position, class, jurusan)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*user.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, position, class, jurusan)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // List provides a mock function with given fields: ctx

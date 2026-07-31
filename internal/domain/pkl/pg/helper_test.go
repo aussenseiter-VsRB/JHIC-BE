@@ -55,27 +55,29 @@ func TestMain(m *testing.M) {
 
 func startPostgres(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	_, err := testPool.Exec(context.Background(), `TRUNCATE sessions, berita, users CASCADE`)
+	_, err := testPool.Exec(context.Background(), `TRUNCATE pkl_requests, sessions, berita, users CASCADE`)
 	require.NoError(t, err)
 	return testPool
 }
 
-func seedUser(t *testing.T, id, email, name, role string) {
+func seedUser(t *testing.T, id, email, class, jurusan string) {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
-		`INSERT INTO users (id, email, password_hash, name, role, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-		id, email, "hash", name, role,
+		`INSERT INTO users (id, email, password_hash, name, role, class, jurusan, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+		 ON CONFLICT (id) DO NOTHING`,
+		id, email, "hash", "Student", "user", class, jurusan,
 	)
 	require.NoError(t, err)
 }
 
-func seedGuru(t *testing.T, id, email, position, class, jurusan string) {
+func seedGuru(t *testing.T, id, email, position string) {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
-		`INSERT INTO users (id, email, password_hash, name, role, class, jurusan, position, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
-		id, email, "hash", "Guru", "guru", class, jurusan, position,
+		`INSERT INTO users (id, email, password_hash, name, role, position, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+		 ON CONFLICT (id) DO NOTHING`,
+		id, email, "hash", "Guru", "guru", position,
 	)
 	require.NoError(t, err)
 }
