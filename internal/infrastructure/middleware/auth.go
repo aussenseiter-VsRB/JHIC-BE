@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 )
 
 type contextKey string
 
 const UserIDKey contextKey = "user_id"
 
-type TokenValidator func(ctx context.Context, token string) (string, error)
+type TokenValidator func(ctx context.Context, token string) (id.ID, error)
 
 func Auth(validate TokenValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -25,7 +26,7 @@ func Auth(validate TokenValidator) func(http.Handler) http.Handler {
 			token := strings.TrimPrefix(auth, "Bearer ")
 
 			userID, err := validate(r.Context(), token)
-			if err != nil || userID == "" {
+			if err != nil || userID == 0 {
 				response.Error(w, http.StatusUnauthorized, "invalid or expired token")
 				return
 			}

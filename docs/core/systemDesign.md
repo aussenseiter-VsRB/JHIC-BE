@@ -51,7 +51,7 @@ internal/
 │   ├── middleware/          — CORS, logging, auth, role
 │   ├── response/            — JSON response helpers
 │   └── storage/             — S3-compatible storage (Backblaze B2 / MinIO)
-├── pkg/id/                  — UUID v4 generator (stdlib only)
+├── pkg/id/                  — Snowflake ID generator (stdlib only)
 └── router.go                — Route registration + middleware chain
 
 config/

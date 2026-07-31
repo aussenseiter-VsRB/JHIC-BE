@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -60,22 +61,22 @@ func startPostgres(t *testing.T) *pgxpool.Pool {
 	return testPool
 }
 
-func seedUser(t *testing.T, id, email, name, role string) {
+func seedUser(t *testing.T, id id.ID, email, name, role string) {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
 		`INSERT INTO users (id, email, password_hash, name, role, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-		id, email, "hash", name, role,
+		int64(id), email, "hash", name, role,
 	)
 	require.NoError(t, err)
 }
 
-func seedGuru(t *testing.T, id, email, position, class, jurusan string) {
+func seedGuru(t *testing.T, id id.ID, email, position, class, jurusan string) {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
 		`INSERT INTO users (id, email, password_hash, name, role, class, jurusan, position, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
-		id, email, "hash", "Guru", "guru", class, jurusan, position,
+		int64(id), email, "hash", "Guru", "guru", class, jurusan, position,
 	)
 	require.NoError(t, err)
 }

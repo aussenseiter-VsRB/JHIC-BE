@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -30,7 +31,7 @@ func (r *UsersRepository) Create(ctx context.Context, u *auth.User) error {
 	return nil
 }
 
-func (r *UsersRepository) ByID(ctx context.Context, id string) (*auth.User, error) {
+func (r *UsersRepository) ByID(ctx context.Context, id id.ID) (*auth.User, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT id, email, password_hash, name, role, COALESCE(avatar_url, ''), COALESCE(class, ''), COALESCE(jurusan, ''), COALESCE(position, ''), created_at, updated_at
 		 FROM users WHERE id = $1`, id,

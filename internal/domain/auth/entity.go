@@ -1,9 +1,13 @@
 package auth
 
-import "time"
+import (
+	"time"
+
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
+)
 
 type User struct {
-	ID           string    `json:"id"`
+	ID           id.ID     `json:"id"`
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"`
 	Name         string    `json:"name"`
@@ -18,7 +22,7 @@ type User struct {
 
 type Session struct {
 	Token     string    `json:"token"`
-	UserID    string    `json:"user_id"`
+	UserID    id.ID     `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`
 }

@@ -37,7 +37,7 @@ Define the domain struct. Use `json:"name,omitempty"` tags for optional fields.
 
 ```go
 type User struct {
-    ID        string    `json:"id"`
+    ID        id.ID     `json:"id"`
     Email     string    `json:"email"`
     Name      string    `json:"name"`
     CreatedAt time.Time `json:"created_at"`
@@ -91,7 +91,7 @@ func NewService(repo Repository) *Service {
 }
 ```
 
-- Use `internal/pkg/id.New()` for UUID generation.
+- Use `internal/pkg/id.New()` for ID generation. IDs are `id.ID` (int64 snowflakes); pass them as `id.ID`, never as `string`. JSON serialization handles string encoding automatically.
 - Timestamps use `time.Now().UTC()`.
 - Validate business rules here (e.g., duplicate email check).
 

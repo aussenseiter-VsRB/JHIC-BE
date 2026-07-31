@@ -8,6 +8,7 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 )
 
 type Handler struct {
@@ -37,7 +38,7 @@ func roleMW(authMw func(http.Handler) http.Handler, roleCheck middleware.RoleChe
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
 
 	var input struct {
 		Company     string `json:"company"`
@@ -83,7 +84,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
 	role := r.Context().Value(middleware.RoleKey).(string)
 
 	list, err := h.svc.List(r.Context(), userID, role)
@@ -95,9 +96,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
 	role := r.Context().Value(middleware.RoleKey).(string)
-	id := r.PathValue("id")
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 
 	req, err := h.svc.Get(r.Context(), userID, role, id)
 	if err != nil {
@@ -115,8 +120,12 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
-	id := r.PathValue("id")
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 
 	var input struct {
 		Decision string `json:"decision"`
@@ -148,8 +157,12 @@ func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
-	id := r.PathValue("id")
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 
 	var input struct {
 		Reason string `json:"reason"`

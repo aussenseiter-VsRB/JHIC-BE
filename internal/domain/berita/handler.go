@@ -16,11 +16,12 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
 	stor "github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/storage"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 )
 
 type Handler struct {
-	svc    *Service
-	store  stor.Client
+	svc   *Service
+	store stor.Client
 }
 
 func NewHandler(svc *Service, store stor.Client) *Handler {
@@ -37,7 +38,7 @@ func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
 
 	var input struct {
 		Title   string `json:"title"`
@@ -74,7 +75,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 	b, err := h.svc.ByID(r.Context(), id)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
@@ -89,8 +94,12 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
-	id := r.PathValue("id")
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 
 	var input struct {
 		Title   string `json:"title"`
@@ -118,8 +127,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
-	id := r.PathValue("id")
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 
 	b, err := h.svc.ByID(r.Context(), id)
 	if err != nil {
@@ -156,8 +169,12 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UploadImage(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.UserIDKey).(string)
-	beritaID := r.PathValue("id")
+	userID := r.Context().Value(middleware.UserIDKey).(id.ID)
+	beritaID, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	if err := r.ParseMultipartForm(5 << 20); err != nil {

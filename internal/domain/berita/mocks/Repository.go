@@ -7,6 +7,8 @@ import (
 
 	berita "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 
+	id "github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -15,9 +17,9 @@ type Repository struct {
 	mock.Mock
 }
 
-// ByID provides a mock function with given fields: ctx, id
-func (_m *Repository) ByID(ctx context.Context, id string) (*berita.Berita, error) {
-	ret := _m.Called(ctx, id)
+// ByID provides a mock function with given fields: ctx, _a1
+func (_m *Repository) ByID(ctx context.Context, _a1 id.ID) (*berita.Berita, error) {
+	ret := _m.Called(ctx, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByID")
@@ -25,19 +27,19 @@ func (_m *Repository) ByID(ctx context.Context, id string) (*berita.Berita, erro
 
 	var r0 *berita.Berita
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*berita.Berita, error)); ok {
-		return rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, id.ID) (*berita.Berita, error)); ok {
+		return rf(ctx, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *berita.Berita); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, id.ID) *berita.Berita); ok {
+		r0 = rf(ctx, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*berita.Berita)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, id)
+	if rf, ok := ret.Get(1).(func(context.Context, id.ID) error); ok {
+		r1 = rf(ctx, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -63,17 +65,17 @@ func (_m *Repository) Create(ctx context.Context, b *berita.Berita) error {
 	return r0
 }
 
-// Delete provides a mock function with given fields: ctx, id
-func (_m *Repository) Delete(ctx context.Context, id string) error {
-	ret := _m.Called(ctx, id)
+// Delete provides a mock function with given fields: ctx, _a1
+func (_m *Repository) Delete(ctx context.Context, _a1 id.ID) error {
+	ret := _m.Called(ctx, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, id.ID) error); ok {
+		r0 = rf(ctx, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}

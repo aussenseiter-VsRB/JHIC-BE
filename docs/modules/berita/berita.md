@@ -15,8 +15,8 @@ The `berita` domain handles news article CRUD and image management. Articles are
 
 ```go
 type Berita struct {
-    ID        string    `json:"id"`
-    AuthorID  string    `json:"author_id"`
+    ID        id.ID     `json:"id"`
+    AuthorID  id.ID     `json:"author_id"`
     Title     string    `json:"title"`
     Content   string    `json:"content"`
     ImageURL  string    `json:"image_url,omitempty"`

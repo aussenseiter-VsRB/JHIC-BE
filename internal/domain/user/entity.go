@@ -1,9 +1,13 @@
 package user
 
-import "time"
+import (
+	"time"
+
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
+)
 
 type User struct {
-	ID        string    `json:"id"`
+	ID        id.ID     `json:"id"`
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	Role      string    `json:"role"`

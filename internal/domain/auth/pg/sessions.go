@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,7 +19,7 @@ func NewSessionsRepository(pool *pgxpool.Pool) *SessionsRepository {
 	return &SessionsRepository{pool: pool}
 }
 
-func (r *SessionsRepository) Create(ctx context.Context, token, userID string, expiresAt int64) error {
+func (r *SessionsRepository) Create(ctx context.Context, token string, userID id.ID, expiresAt int64) error {
 	_, err := r.pool.Exec(ctx,
 		`INSERT INTO sessions (token, user_id, created_at, expires_at)
 		 VALUES ($1, $2, $3, $4)`,
@@ -46,7 +47,7 @@ func (r *SessionsRepository) ByToken(ctx context.Context, token string) (*auth.S
 	return s, nil
 }
 
-func (r *SessionsRepository) DeleteByUserID(ctx context.Context, userID string) error {
+func (r *SessionsRepository) DeleteByUserID(ctx context.Context, userID id.ID) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
 	if err != nil {
 		return fmt.Errorf("delete sessions: %w", err)

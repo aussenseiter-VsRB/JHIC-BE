@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS berita (
-    id TEXT PRIMARY KEY,
-    author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id BIGINT PRIMARY KEY,
+    author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
     image_url TEXT NOT NULL DEFAULT '',

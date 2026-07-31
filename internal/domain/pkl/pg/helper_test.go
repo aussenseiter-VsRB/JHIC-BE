@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -60,24 +61,24 @@ func startPostgres(t *testing.T) *pgxpool.Pool {
 	return testPool
 }
 
-func seedUser(t *testing.T, id, email, class, jurusan string) {
+func seedUser(t *testing.T, id id.ID, email, class, jurusan string) {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
 		`INSERT INTO users (id, email, password_hash, name, role, class, jurusan, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
 		 ON CONFLICT (id) DO NOTHING`,
-		id, email, "hash", "Student", "user", class, jurusan,
+		int64(id), email, "hash", "Student", "user", class, jurusan,
 	)
 	require.NoError(t, err)
 }
 
-func seedGuru(t *testing.T, id, email, position string) {
+func seedGuru(t *testing.T, id id.ID, email, position string) {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
 		`INSERT INTO users (id, email, password_hash, name, role, position, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
 		 ON CONFLICT (id) DO NOTHING`,
-		id, email, "hash", "Guru", "guru", position,
+		int64(id), email, "hash", "Guru", "guru", position,
 	)
 	require.NoError(t, err)
 }

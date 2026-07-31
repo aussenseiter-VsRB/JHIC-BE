@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -41,7 +42,7 @@ func (r *Repository) List(ctx context.Context) ([]user.User, error) {
 	return users, rows.Err()
 }
 
-func (r *Repository) ByID(ctx context.Context, id string) (*user.User, error) {
+func (r *Repository) ByID(ctx context.Context, id id.ID) (*user.User, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT `+userColumns+` FROM users WHERE id = $1`, id,
 	)
@@ -110,7 +111,7 @@ func (r *Repository) Update(ctx context.Context, u *user.User) error {
 	return nil
 }
 
-func (r *Repository) UpdateRole(ctx context.Context, id, role string) error {
+func (r *Repository) UpdateRole(ctx context.Context, id id.ID, role string) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE users SET role = $2, updated_at = NOW() WHERE id = $1`,
 		id, role,
@@ -121,7 +122,7 @@ func (r *Repository) UpdateRole(ctx context.Context, id, role string) error {
 	return nil
 }
 
-func (r *Repository) Delete(ctx context.Context, id string) error {
+func (r *Repository) Delete(ctx context.Context, id id.ID) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete user: %w", err)

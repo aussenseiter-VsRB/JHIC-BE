@@ -5,6 +5,7 @@ package mocks
 import (
 	context "context"
 
+	id "github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	mock "github.com/stretchr/testify/mock"
 
 	user "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
@@ -15,9 +16,9 @@ type Users struct {
 	mock.Mock
 }
 
-// ByID provides a mock function with given fields: ctx, id
-func (_m *Users) ByID(ctx context.Context, id string) (*user.User, error) {
-	ret := _m.Called(ctx, id)
+// ByID provides a mock function with given fields: ctx, _a1
+func (_m *Users) ByID(ctx context.Context, _a1 id.ID) (*user.User, error) {
+	ret := _m.Called(ctx, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByID")
@@ -25,19 +26,19 @@ func (_m *Users) ByID(ctx context.Context, id string) (*user.User, error) {
 
 	var r0 *user.User
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*user.User, error)); ok {
-		return rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, id.ID) (*user.User, error)); ok {
+		return rf(ctx, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *user.User); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, id.ID) *user.User); ok {
+		r0 = rf(ctx, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*user.User)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, id)
+	if rf, ok := ret.Get(1).(func(context.Context, id.ID) error); ok {
+		r1 = rf(ctx, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}

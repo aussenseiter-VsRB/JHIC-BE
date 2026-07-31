@@ -6,6 +6,7 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 )
 
 type Handler struct {
@@ -39,7 +40,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 	user, err := h.svc.ByID(r.Context(), id)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
@@ -85,7 +90,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 	var input struct {
 		Name      string `json:"name"`
 		AvatarURL string `json:"avatar_url"`
@@ -106,7 +115,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 	var input struct {
 		Role string `json:"role"`
 	}
@@ -122,7 +135,11 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
 	if err := h.svc.Delete(r.Context(), id); err != nil {
 		response.Error(w, http.StatusInternalServerError, err.Error())
 		return

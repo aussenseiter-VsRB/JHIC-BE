@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -57,7 +58,7 @@ func (r *Repository) CreateRequest(ctx context.Context, req *pkl.PklRequest, ste
 	return nil
 }
 
-func (r *Repository) ByID(ctx context.Context, id string) (*pkl.PklRequest, error) {
+func (r *Repository) ByID(ctx context.Context, id id.ID) (*pkl.PklRequest, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT `+requestColumns+` FROM pkl_requests WHERE id = $1`, id,
 	)
@@ -71,7 +72,7 @@ func (r *Repository) ByID(ctx context.Context, id string) (*pkl.PklRequest, erro
 	return req, nil
 }
 
-func (r *Repository) ListByRequester(ctx context.Context, requesterID string) ([]pkl.PklRequest, error) {
+func (r *Repository) ListByRequester(ctx context.Context, requesterID id.ID) ([]pkl.PklRequest, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT `+requestColumns+` FROM pkl_requests WHERE requester_id = $1 ORDER BY created_at DESC`, requesterID,
 	)
@@ -91,7 +92,7 @@ func (r *Repository) ListByRequester(ctx context.Context, requesterID string) ([
 	return list, rows.Err()
 }
 
-func (r *Repository) ListForApprover(ctx context.Context, approverID string) ([]pkl.PklRequest, error) {
+func (r *Repository) ListForApprover(ctx context.Context, approverID id.ID) ([]pkl.PklRequest, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT DISTINCT `+requestColumnsPrefixed+`
 		 FROM pkl_requests r
@@ -135,7 +136,7 @@ func (r *Repository) ListAll(ctx context.Context) ([]pkl.PklRequest, error) {
 	return list, rows.Err()
 }
 
-func (r *Repository) StepsByRequest(ctx context.Context, requestID string) ([]pkl.Step, error) {
+func (r *Repository) StepsByRequest(ctx context.Context, requestID id.ID) ([]pkl.Step, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT `+stepColumns+` FROM pkl_approval_steps WHERE pkl_request_id = $1 ORDER BY sequence ASC`, requestID,
 	)

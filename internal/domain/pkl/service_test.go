@@ -9,24 +9,26 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl/mocks"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func approver(position, id string) *user.User {
+func approver(position string, id id.ID) *user.User {
 	return &user.User{ID: id, Role: "guru", Position: position}
 }
 
-func fullSteps(requestID string) []pkl.Step {
+func fullSteps(requestID id.ID) []pkl.Step {
 	now := time.Now().UTC()
 	positions := []string{"wali_kelas", "bk", "kesiswaan", "kaprog"}
+	approverIDs := []id.ID{id.ID(100), id.ID(101), id.ID(102), id.ID(103)}
 	steps := make([]pkl.Step, 0, 4)
 	for i, pos := range positions {
 		steps = append(steps, pkl.Step{
-			ID:         requestID + "-step-" + pos,
+			ID:         id.ID(1000 + i),
 			RequestID:  requestID,
 			Position:   pos,
-			ApproverID: "guru-" + pos,
+			ApproverID: approverIDs[i],
 			Status:     pkl.StepPending,
 			Sequence:   i + 1,
 			CreatedAt:  now,
@@ -44,13 +46,13 @@ func TestService_Create(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		users.On("ByID", mock.Anything, "student-1").Return(&user.User{ID: "student-1", Class: "PPLG 1", Jurusan: "PPLG"}, nil)
-		users.On("FindByPosition", mock.Anything, "wali_kelas", "PPLG 1", "").Return(approver("wali_kelas", "guru-wali_kelas"), nil)
-		users.On("FindByPosition", mock.Anything, "bk", "", "").Return(approver("bk", "guru-bk"), nil)
-		users.On("FindByPosition", mock.Anything, "kesiswaan", "", "").Return(approver("kesiswaan", "guru-kesiswaan"), nil)
-		users.On("FindByPosition", mock.Anything, "kaprog", "", "PPLG").Return(approver("kaprog", "guru-kaprog"), nil)
+		users.On("ByID", mock.Anything, id.ID(10)).Return(&user.User{ID: id.ID(10), Class: "PPLG 1", Jurusan: "PPLG"}, nil)
+		users.On("FindByPosition", mock.Anything, "wali_kelas", "PPLG 1", "").Return(approver("wali_kelas", id.ID(100)), nil)
+		users.On("FindByPosition", mock.Anything, "bk", "", "").Return(approver("bk", id.ID(101)), nil)
+		users.On("FindByPosition", mock.Anything, "kesiswaan", "", "").Return(approver("kesiswaan", id.ID(102)), nil)
+		users.On("FindByPosition", mock.Anything, "kaprog", "", "PPLG").Return(approver("kaprog", id.ID(103)), nil)
 		repo.On("CreateRequest", mock.Anything, mock.MatchedBy(func(r *pkl.PklRequest) bool {
-			return r.RequesterID == "student-1" && r.Status == pkl.StatusPending && r.CurrentStep == 1 && r.ID != ""
+			return r.RequesterID == id.ID(10) && r.Status == pkl.StatusPending && r.CurrentStep == 1 && r.ID != 0
 		}), mock.MatchedBy(func(steps []pkl.Step) bool {
 			if len(steps) != 4 {
 				return false
@@ -60,25 +62,25 @@ func TestService_Create(t *testing.T) {
 					return false
 				}
 			}
-			return steps[0].ApproverID == "guru-wali_kelas" && steps[3].ApproverID == "guru-kaprog"
+			return steps[0].ApproverID == id.ID(100) && steps[3].ApproverID == id.ID(103)
 		})).Return(nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Create(context.Background(), "student-1", "PT Maju", "Jl. Merdeka 1", start, end, "PKL di perusahaan")
+		got, err := svc.Create(context.Background(), id.ID(10), "PT Maju", "Jl. Merdeka 1", start, end, "PKL di perusahaan")
 		require.NoError(t, err)
 		require.Equal(t, pkl.StatusPending, got.Status)
 		require.Len(t, got.Steps, 4)
-		require.Equal(t, "guru-wali_kelas", got.Steps[0].ApproverID)
+		require.Equal(t, id.ID(100), got.Steps[0].ApproverID)
 	})
 
 	t.Run("requester not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		users.On("ByID", mock.Anything, "student-1").Return((*user.User)(nil), nil)
+		users.On("ByID", mock.Anything, id.ID(10)).Return((*user.User)(nil), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Create(context.Background(), "student-1", "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
+		_, err := svc.Create(context.Background(), id.ID(10), "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
 		require.EqualError(t, err, "requester not found")
 	})
 
@@ -86,11 +88,11 @@ func TestService_Create(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		users.On("ByID", mock.Anything, "student-1").Return(&user.User{ID: "student-1", Class: "PPLG 1", Jurusan: "PPLG"}, nil)
+		users.On("ByID", mock.Anything, id.ID(10)).Return(&user.User{ID: id.ID(10), Class: "PPLG 1", Jurusan: "PPLG"}, nil)
 		users.On("FindByPosition", mock.Anything, "wali_kelas", "PPLG 1", "").Return((*user.User)(nil), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Create(context.Background(), "student-1", "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
+		_, err := svc.Create(context.Background(), id.ID(10), "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
 		require.EqualError(t, err, "no wali_kelas assigned for this request")
 	})
 
@@ -98,14 +100,14 @@ func TestService_Create(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		users.On("ByID", mock.Anything, "student-1").Return(&user.User{ID: "student-1", Class: "PPLG 1", Jurusan: "PPLG"}, nil)
-		users.On("FindByPosition", mock.Anything, "wali_kelas", "PPLG 1", "").Return(approver("wali_kelas", "guru-wali_kelas"), nil)
-		users.On("FindByPosition", mock.Anything, "bk", "", "").Return(approver("bk", "guru-bk"), nil)
-		users.On("FindByPosition", mock.Anything, "kesiswaan", "", "").Return(approver("kesiswaan", "guru-kesiswaan"), nil)
+		users.On("ByID", mock.Anything, id.ID(10)).Return(&user.User{ID: id.ID(10), Class: "PPLG 1", Jurusan: "PPLG"}, nil)
+		users.On("FindByPosition", mock.Anything, "wali_kelas", "PPLG 1", "").Return(approver("wali_kelas", id.ID(100)), nil)
+		users.On("FindByPosition", mock.Anything, "bk", "", "").Return(approver("bk", id.ID(101)), nil)
+		users.On("FindByPosition", mock.Anything, "kesiswaan", "", "").Return(approver("kesiswaan", id.ID(102)), nil)
 		users.On("FindByPosition", mock.Anything, "kaprog", "", "PPLG").Return((*user.User)(nil), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Create(context.Background(), "student-1", "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
+		_, err := svc.Create(context.Background(), id.ID(10), "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
 		require.EqualError(t, err, "no kaprog assigned for this request")
 	})
 
@@ -113,10 +115,10 @@ func TestService_Create(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		users.On("ByID", mock.Anything, "student-1").Return(&user.User{ID: "student-1", Class: "PPLG 1", Jurusan: "PPLG"}, nil)
+		users.On("ByID", mock.Anything, id.ID(10)).Return(&user.User{ID: id.ID(10), Class: "PPLG 1", Jurusan: "PPLG"}, nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Create(context.Background(), "student-1", "PT Maju", "Jl. Merdeka 1", end, start, "PKL")
+		_, err := svc.Create(context.Background(), id.ID(10), "PT Maju", "Jl. Merdeka 1", end, start, "PKL")
 		require.EqualError(t, err, "end date must be on or after start date")
 	})
 
@@ -124,11 +126,11 @@ func TestService_Create(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		users.On("ByID", mock.Anything, "student-1").Return(&user.User{ID: "student-1", Class: "PPLG 1", Jurusan: "PPLG"}, nil)
+		users.On("ByID", mock.Anything, id.ID(10)).Return(&user.User{ID: id.ID(10), Class: "PPLG 1", Jurusan: "PPLG"}, nil)
 		users.On("FindByPosition", mock.Anything, "wali_kelas", "PPLG 1", "").Return((*user.User)(nil), errors.New("db down"))
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Create(context.Background(), "student-1", "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
+		_, err := svc.Create(context.Background(), id.ID(10), "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
 		require.EqualError(t, err, "db down")
 	})
 
@@ -136,15 +138,15 @@ func TestService_Create(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		users.On("ByID", mock.Anything, "student-1").Return(&user.User{ID: "student-1", Class: "PPLG 1", Jurusan: "PPLG"}, nil)
-		users.On("FindByPosition", mock.Anything, "wali_kelas", "PPLG 1", "").Return(approver("wali_kelas", "guru-wali_kelas"), nil)
-		users.On("FindByPosition", mock.Anything, "bk", "", "").Return(approver("bk", "guru-bk"), nil)
-		users.On("FindByPosition", mock.Anything, "kesiswaan", "", "").Return(approver("kesiswaan", "guru-kesiswaan"), nil)
-		users.On("FindByPosition", mock.Anything, "kaprog", "", "PPLG").Return(approver("kaprog", "guru-kaprog"), nil)
+		users.On("ByID", mock.Anything, id.ID(10)).Return(&user.User{ID: id.ID(10), Class: "PPLG 1", Jurusan: "PPLG"}, nil)
+		users.On("FindByPosition", mock.Anything, "wali_kelas", "PPLG 1", "").Return(approver("wali_kelas", id.ID(100)), nil)
+		users.On("FindByPosition", mock.Anything, "bk", "", "").Return(approver("bk", id.ID(101)), nil)
+		users.On("FindByPosition", mock.Anything, "kesiswaan", "", "").Return(approver("kesiswaan", id.ID(102)), nil)
+		users.On("FindByPosition", mock.Anything, "kaprog", "", "PPLG").Return(approver("kaprog", id.ID(103)), nil)
 		repo.On("CreateRequest", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("insert failed"))
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Create(context.Background(), "student-1", "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
+		_, err := svc.Create(context.Background(), id.ID(10), "PT Maju", "Jl. Merdeka 1", start, end, "PKL")
 		require.EqualError(t, err, "insert failed")
 	})
 }
@@ -154,13 +156,13 @@ func TestService_List(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		reqs := []pkl.PklRequest{{ID: "req-1"}, {ID: "req-2"}}
+		reqs := []pkl.PklRequest{{ID: id.ID(20)}, {ID: id.ID(21)}}
 		repo.On("ListAll", mock.Anything).Return(reqs, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
-		repo.On("StepsByRequest", mock.Anything, "req-2").Return(fullSteps("req-2"), nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(21)).Return(fullSteps(id.ID(21)), nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.List(context.Background(), "admin-1", "admin")
+		got, err := svc.List(context.Background(), id.ID(200), "admin")
 		require.NoError(t, err)
 		require.Len(t, got, 2)
 		require.Len(t, got[0].Steps, 4)
@@ -170,12 +172,12 @@ func TestService_List(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		reqs := []pkl.PklRequest{{ID: "req-1"}}
-		repo.On("ListForApprover", mock.Anything, "guru-bk").Return(reqs, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		reqs := []pkl.PklRequest{{ID: id.ID(20)}}
+		repo.On("ListForApprover", mock.Anything, id.ID(101)).Return(reqs, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.List(context.Background(), "guru-bk", "guru")
+		got, err := svc.List(context.Background(), id.ID(101), "guru")
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 	})
@@ -184,12 +186,12 @@ func TestService_List(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		reqs := []pkl.PklRequest{{ID: "req-1"}}
-		repo.On("ListByRequester", mock.Anything, "student-1").Return(reqs, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		reqs := []pkl.PklRequest{{ID: id.ID(20)}}
+		repo.On("ListByRequester", mock.Anything, id.ID(10)).Return(reqs, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.List(context.Background(), "student-1", "user")
+		got, err := svc.List(context.Background(), id.ID(10), "user")
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 	})
@@ -201,24 +203,24 @@ func TestService_Get(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		repo.On("ByID", mock.Anything, "req-1").Return(&pkl.PklRequest{ID: "req-1", RequesterID: "student-1"}, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(&pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10)}, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Get(context.Background(), "student-1", "user", "req-1")
+		got, err := svc.Get(context.Background(), id.ID(10), "user", id.ID(20))
 		require.NoError(t, err)
-		require.Equal(t, "req-1", got.ID)
+		require.Equal(t, id.ID(20), got.ID)
 	})
 
 	t.Run("other user forbidden", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		repo.On("ByID", mock.Anything, "req-1").Return(&pkl.PklRequest{ID: "req-1", RequesterID: "student-1"}, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(&pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10)}, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Get(context.Background(), "student-2", "user", "req-1")
+		_, err := svc.Get(context.Background(), id.ID(11), "user", id.ID(20))
 		require.EqualError(t, err, "forbidden: not the requester")
 	})
 
@@ -226,24 +228,24 @@ func TestService_Get(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		repo.On("ByID", mock.Anything, "req-1").Return(&pkl.PklRequest{ID: "req-1", RequesterID: "student-1"}, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(&pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10)}, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Get(context.Background(), "guru-wali_kelas", "guru", "req-1")
+		got, err := svc.Get(context.Background(), id.ID(100), "guru", id.ID(20))
 		require.NoError(t, err)
-		require.Equal(t, "req-1", got.ID)
+		require.Equal(t, id.ID(20), got.ID)
 	})
 
 	t.Run("unrelated guru forbidden", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		repo.On("ByID", mock.Anything, "req-1").Return(&pkl.PklRequest{ID: "req-1", RequesterID: "student-1"}, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(&pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10)}, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Get(context.Background(), "guru-other", "guru", "req-1")
+		_, err := svc.Get(context.Background(), id.ID(104), "guru", id.ID(20))
 		require.EqualError(t, err, "forbidden: not an approver on this request")
 	})
 
@@ -251,23 +253,23 @@ func TestService_Get(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		repo.On("ByID", mock.Anything, "req-1").Return(&pkl.PklRequest{ID: "req-1", RequesterID: "student-1"}, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(&pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10)}, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Get(context.Background(), "admin-1", "admin", "req-1")
+		got, err := svc.Get(context.Background(), id.ID(200), "admin", id.ID(20))
 		require.NoError(t, err)
-		require.Equal(t, "req-1", got.ID)
+		require.Equal(t, id.ID(20), got.ID)
 	})
 
 	t.Run("not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*pkl.PklRequest)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*pkl.PklRequest)(nil), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Get(context.Background(), "admin-1", "admin", "missing")
+		_, err := svc.Get(context.Background(), id.ID(200), "admin", id.ID(99))
 		require.EqualError(t, err, "pkl request not found")
 	})
 }
@@ -278,9 +280,9 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending, CurrentStep: 1}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending, CurrentStep: 1}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 		repo.On("Decide", mock.Anything, mock.MatchedBy(func(r *pkl.PklRequest) bool {
 			return r.Status == pkl.StatusPending && r.CurrentStep == 2
 		}), mock.MatchedBy(func(s *pkl.Step) bool {
@@ -288,7 +290,7 @@ func TestService_Decide(t *testing.T) {
 		}), pkl.StatusPending, pkl.StepPending).Return(nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Decide(context.Background(), "guru-wali_kelas", "req-1", pkl.DecisionApprove, "ok")
+		got, err := svc.Decide(context.Background(), id.ID(100), id.ID(20), pkl.DecisionApprove, "ok")
 		require.NoError(t, err)
 		require.Equal(t, pkl.StatusPending, got.Status)
 		require.Equal(t, 2, got.CurrentStep)
@@ -298,9 +300,9 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending, CurrentStep: 4}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending, CurrentStep: 4}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 		repo.On("Decide", mock.Anything, mock.MatchedBy(func(r *pkl.PklRequest) bool {
 			return r.Status == pkl.StatusAccepted
 		}), mock.MatchedBy(func(s *pkl.Step) bool {
@@ -308,7 +310,7 @@ func TestService_Decide(t *testing.T) {
 		}), pkl.StatusPending, pkl.StepPending).Return(nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Decide(context.Background(), "guru-kaprog", "req-1", pkl.DecisionApprove, "")
+		got, err := svc.Decide(context.Background(), id.ID(103), id.ID(20), pkl.DecisionApprove, "")
 		require.NoError(t, err)
 		require.Equal(t, pkl.StatusAccepted, got.Status)
 	})
@@ -317,9 +319,9 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending, CurrentStep: 1}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending, CurrentStep: 1}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 		repo.On("Decide", mock.Anything, mock.MatchedBy(func(r *pkl.PklRequest) bool {
 			return r.Status == pkl.StatusRejected
 		}), mock.MatchedBy(func(s *pkl.Step) bool {
@@ -327,7 +329,7 @@ func TestService_Decide(t *testing.T) {
 		}), pkl.StatusPending, pkl.StepPending).Return(nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Decide(context.Background(), "guru-wali_kelas", "req-1", pkl.DecisionReject, "tidak sesuai")
+		got, err := svc.Decide(context.Background(), id.ID(100), id.ID(20), pkl.DecisionReject, "tidak sesuai")
 		require.NoError(t, err)
 		require.Equal(t, pkl.StatusRejected, got.Status)
 	})
@@ -336,9 +338,9 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending, CurrentStep: 2}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending, CurrentStep: 2}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 		repo.On("Decide", mock.Anything, mock.MatchedBy(func(r *pkl.PklRequest) bool {
 			return r.Status == pkl.StatusNeedsAction
 		}), mock.MatchedBy(func(s *pkl.Step) bool {
@@ -346,7 +348,7 @@ func TestService_Decide(t *testing.T) {
 		}), pkl.StatusPending, pkl.StepPending).Return(nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Decide(context.Background(), "guru-bk", "req-1", pkl.DecisionNeedsAction, "datang ke ruang BK")
+		got, err := svc.Decide(context.Background(), id.ID(101), id.ID(20), pkl.DecisionNeedsAction, "datang ke ruang BK")
 		require.NoError(t, err)
 		require.Equal(t, pkl.StatusNeedsAction, got.Status)
 		require.Equal(t, 2, got.CurrentStep)
@@ -356,11 +358,11 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		frozen := fullSteps("req-1")
+		frozen := fullSteps(id.ID(20))
 		frozen[1].Status = pkl.StepNeedsAction
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusNeedsAction, CurrentStep: 2}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(frozen, nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusNeedsAction, CurrentStep: 2}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(frozen, nil)
 		repo.On("Decide", mock.Anything, mock.MatchedBy(func(r *pkl.PklRequest) bool {
 			return r.Status == pkl.StatusPending && r.CurrentStep == 3
 		}), mock.MatchedBy(func(s *pkl.Step) bool {
@@ -368,7 +370,7 @@ func TestService_Decide(t *testing.T) {
 		}), pkl.StatusNeedsAction, pkl.StepNeedsAction).Return(nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Decide(context.Background(), "guru-bk", "req-1", pkl.DecisionApprove, "sudah bertemu")
+		got, err := svc.Decide(context.Background(), id.ID(101), id.ID(20), pkl.DecisionApprove, "sudah bertemu")
 		require.NoError(t, err)
 		require.Equal(t, pkl.StatusPending, got.Status)
 		require.Equal(t, 3, got.CurrentStep)
@@ -378,11 +380,11 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		frozen := fullSteps("req-1")
+		frozen := fullSteps(id.ID(20))
 		frozen[1].Status = pkl.StepNeedsAction
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusNeedsAction, CurrentStep: 2}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(frozen, nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusNeedsAction, CurrentStep: 2}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(frozen, nil)
 		repo.On("Decide", mock.Anything, mock.MatchedBy(func(r *pkl.PklRequest) bool {
 			return r.Status == pkl.StatusRejected
 		}), mock.MatchedBy(func(s *pkl.Step) bool {
@@ -390,7 +392,7 @@ func TestService_Decide(t *testing.T) {
 		}), pkl.StatusNeedsAction, pkl.StepNeedsAction).Return(nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Decide(context.Background(), "guru-bk", "req-1", pkl.DecisionReject, "tidak lanjut")
+		got, err := svc.Decide(context.Background(), id.ID(101), id.ID(20), pkl.DecisionReject, "tidak lanjut")
 		require.NoError(t, err)
 		require.Equal(t, pkl.StatusRejected, got.Status)
 	})
@@ -399,12 +401,12 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending, CurrentStep: 2}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending, CurrentStep: 2}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Decide(context.Background(), "guru-kesiswaan", "req-1", pkl.DecisionApprove, "")
+		_, err := svc.Decide(context.Background(), id.ID(102), id.ID(20), pkl.DecisionApprove, "")
 		require.EqualError(t, err, "forbidden: not your step to decide")
 	})
 
@@ -412,14 +414,14 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		frozen := fullSteps("req-1")
+		frozen := fullSteps(id.ID(20))
 		frozen[1].Status = pkl.StepNeedsAction
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusNeedsAction, CurrentStep: 2}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(frozen, nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusNeedsAction, CurrentStep: 2}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(frozen, nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Decide(context.Background(), "guru-kaprog", "req-1", pkl.DecisionApprove, "")
+		_, err := svc.Decide(context.Background(), id.ID(103), id.ID(20), pkl.DecisionApprove, "")
 		require.EqualError(t, err, "forbidden: not your step to decide")
 	})
 
@@ -427,12 +429,12 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusAccepted, CurrentStep: 4}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusAccepted, CurrentStep: 4}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Decide(context.Background(), "guru-kaprog", "req-1", pkl.DecisionApprove, "")
+		_, err := svc.Decide(context.Background(), id.ID(103), id.ID(20), pkl.DecisionApprove, "")
 		require.EqualError(t, err, "request is not awaiting a decision")
 	})
 
@@ -440,12 +442,12 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending, CurrentStep: 1}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending, CurrentStep: 1}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Decide(context.Background(), "guru-wali_kelas", "req-1", "maybe", "")
+		_, err := svc.Decide(context.Background(), id.ID(100), id.ID(20), "maybe", "")
 		require.EqualError(t, err, "invalid decision: must be approve, reject or needs_further_action")
 	})
 
@@ -453,14 +455,14 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		frozen := fullSteps("req-1")
+		frozen := fullSteps(id.ID(20))
 		frozen[1].Status = pkl.StepNeedsAction
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusNeedsAction, CurrentStep: 2}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(frozen, nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusNeedsAction, CurrentStep: 2}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(frozen, nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Decide(context.Background(), "guru-bk", "req-1", pkl.DecisionNeedsAction, "")
+		_, err := svc.Decide(context.Background(), id.ID(101), id.ID(20), pkl.DecisionNeedsAction, "")
 		require.EqualError(t, err, "request already needs further action")
 	})
 
@@ -468,10 +470,10 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*pkl.PklRequest)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*pkl.PklRequest)(nil), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Decide(context.Background(), "guru-wali_kelas", "missing", pkl.DecisionApprove, "")
+		_, err := svc.Decide(context.Background(), id.ID(100), id.ID(99), pkl.DecisionApprove, "")
 		require.EqualError(t, err, "pkl request not found")
 	})
 
@@ -479,13 +481,13 @@ func TestService_Decide(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending, CurrentStep: 1}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
-		repo.On("StepsByRequest", mock.Anything, "req-1").Return(fullSteps("req-1"), nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending, CurrentStep: 1}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
+		repo.On("StepsByRequest", mock.Anything, id.ID(20)).Return(fullSteps(id.ID(20)), nil)
 		repo.On("Decide", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("conflict"))
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Decide(context.Background(), "guru-wali_kelas", "req-1", pkl.DecisionApprove, "")
+		_, err := svc.Decide(context.Background(), id.ID(100), id.ID(20), pkl.DecisionApprove, "")
 		require.EqualError(t, err, "conflict")
 	})
 }
@@ -495,14 +497,14 @@ func TestService_Cancel(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
 		repo.On("Cancel", mock.Anything, mock.MatchedBy(func(r *pkl.PklRequest) bool {
 			return r.Status == pkl.StatusCancelled && r.CancelReason == "salah perusahaan"
 		})).Return(nil)
 
 		svc := pkl.NewService(repo, users)
-		got, err := svc.Cancel(context.Background(), "student-1", "req-1", "salah perusahaan")
+		got, err := svc.Cancel(context.Background(), id.ID(10), id.ID(20), "salah perusahaan")
 		require.NoError(t, err)
 		require.Equal(t, pkl.StatusCancelled, got.Status)
 	})
@@ -512,7 +514,7 @@ func TestService_Cancel(t *testing.T) {
 		users := mocks.NewUsers(t)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Cancel(context.Background(), "student-1", "req-1", "")
+		_, err := svc.Cancel(context.Background(), id.ID(10), id.ID(20), "")
 		require.EqualError(t, err, "cancellation reason is required")
 	})
 
@@ -520,10 +522,10 @@ func TestService_Cancel(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*pkl.PklRequest)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*pkl.PklRequest)(nil), nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Cancel(context.Background(), "student-1", "missing", "alasan")
+		_, err := svc.Cancel(context.Background(), id.ID(10), id.ID(99), "alasan")
 		require.EqualError(t, err, "pkl request not found")
 	})
 
@@ -531,11 +533,11 @@ func TestService_Cancel(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Cancel(context.Background(), "student-2", "req-1", "alasan")
+		_, err := svc.Cancel(context.Background(), id.ID(11), id.ID(20), "alasan")
 		require.EqualError(t, err, "forbidden: not the requester")
 	})
 
@@ -543,11 +545,11 @@ func TestService_Cancel(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusAccepted}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusAccepted}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Cancel(context.Background(), "student-1", "req-1", "alasan")
+		_, err := svc.Cancel(context.Background(), id.ID(10), id.ID(20), "alasan")
 		require.EqualError(t, err, "only pending or needs_further_action requests can be cancelled")
 	})
 
@@ -555,12 +557,12 @@ func TestService_Cancel(t *testing.T) {
 		repo := mocks.NewRepository(t)
 		users := mocks.NewUsers(t)
 
-		req := &pkl.PklRequest{ID: "req-1", RequesterID: "student-1", Status: pkl.StatusPending}
-		repo.On("ByID", mock.Anything, "req-1").Return(req, nil)
+		req := &pkl.PklRequest{ID: id.ID(20), RequesterID: id.ID(10), Status: pkl.StatusPending}
+		repo.On("ByID", mock.Anything, id.ID(20)).Return(req, nil)
 		repo.On("Cancel", mock.Anything, mock.Anything).Return(errors.New("cancel failed"))
 
 		svc := pkl.NewService(repo, users)
-		_, err := svc.Cancel(context.Background(), "student-1", "req-1", "alasan")
+		_, err := svc.Cancel(context.Background(), id.ID(10), id.ID(20), "alasan")
 		require.EqualError(t, err, "cancel failed")
 	})
 }

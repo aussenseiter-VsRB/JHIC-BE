@@ -13,6 +13,7 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -40,7 +41,7 @@ func doJSON(t *testing.T, method, url, token string, body any) *http.Response {
 	return resp
 }
 
-func register(t *testing.T, srvURL, email string) (string, string) {
+func register(t *testing.T, srvURL, email string) (id.ID, string) {
 	t.Helper()
 	resp := doJSON(t, http.MethodPost, srvURL+"/api/v1/auth/register", "", map[string]string{
 		"email":    email,
@@ -58,7 +59,7 @@ func register(t *testing.T, srvURL, email string) (string, string) {
 	return out.User.ID, out.Token
 }
 
-func promoteToJurnal(t *testing.T, e *env, userID string) {
+func promoteToJurnal(t *testing.T, e *env, userID id.ID) {
 	t.Helper()
 	_, err := e.pool.Exec(context.Background(), `UPDATE users SET role = 'jurnal' WHERE id = $1`, userID)
 	require.NoError(t, err)
@@ -190,11 +191,13 @@ func TestE2E_BeritaLifecycle(t *testing.T) {
 	require.NotEmpty(t, created.ID)
 	require.Equal(t, userID, created.AuthorID)
 
-	var dbTitle, dbAuthor, dbContent string
+	var dbTitle string
+	var dbAuthor int64
+	var dbContent string
 	err := e.pool.QueryRow(ctx, `SELECT title, author_id FROM berita WHERE id = $1`, created.ID).Scan(&dbTitle, &dbAuthor)
 	require.NoError(t, err)
 	require.Equal(t, "First News", dbTitle)
-	require.Equal(t, userID, dbAuthor)
+	require.Equal(t, int64(userID), dbAuthor)
 
 	listResp := doJSON(t, http.MethodGet, baseURL, token, nil)
 	require.Equal(t, http.StatusOK, listResp.StatusCode)
@@ -204,14 +207,14 @@ func TestE2E_BeritaLifecycle(t *testing.T) {
 	require.Len(t, list, 1)
 	require.Equal(t, created.ID, list[0].ID)
 
-	getResp := doJSON(t, http.MethodGet, baseURL+"/"+created.ID, token, nil)
+	getResp := doJSON(t, http.MethodGet, baseURL+"/"+created.ID.String(), token, nil)
 	require.Equal(t, http.StatusOK, getResp.StatusCode)
 	var got berita.Berita
 	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
 	getResp.Body.Close()
 	require.Equal(t, created.ID, got.ID)
 
-	updateResp := doJSON(t, http.MethodPut, baseURL+"/"+created.ID, token, map[string]string{
+	updateResp := doJSON(t, http.MethodPut, baseURL+"/"+created.ID.String(), token, map[string]string{
 		"title":   "Updated News",
 		"content": "Updated body",
 	})
@@ -228,7 +231,7 @@ func TestE2E_BeritaLifecycle(t *testing.T) {
 	png := make([]byte, 600)
 	copy(png, "\x89PNG\r\n\x1a\n")
 
-	imgResp := uploadImage(t, baseURL+"/"+created.ID+"/image", token)
+	imgResp := uploadImage(t, baseURL+"/"+created.ID.String()+"/image", token)
 	require.Equal(t, http.StatusOK, imgResp.StatusCode)
 	var imgOut struct {
 		ImageURL string `json:"image_url"`
@@ -260,7 +263,7 @@ func TestE2E_BeritaLifecycle(t *testing.T) {
 	require.Equal(t, http.StatusOK, signedResp.StatusCode)
 	require.Equal(t, png, signed)
 
-	deleteResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID, token, nil)
+	deleteResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID.String(), token, nil)
 	require.Equal(t, http.StatusNoContent, deleteResp.StatusCode)
 	deleteResp.Body.Close()
 
@@ -304,18 +307,18 @@ func TestE2E_RoleAndAuthorization(t *testing.T) {
 	otherID, otherToken := register(t, e.server.URL, "other@example.com")
 	promoteToJurnal(t, e, otherID)
 
-	updateResp := doJSON(t, http.MethodPut, baseURL+"/"+created.ID, otherToken, map[string]string{
+	updateResp := doJSON(t, http.MethodPut, baseURL+"/"+created.ID.String(), otherToken, map[string]string{
 		"title":   "Hijacked",
 		"content": "Nope",
 	})
 	require.Equal(t, http.StatusForbidden, updateResp.StatusCode)
 	updateResp.Body.Close()
 
-	deleteResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID, otherToken, nil)
+	deleteResp := doJSON(t, http.MethodDelete, baseURL+"/"+created.ID.String(), otherToken, nil)
 	require.Equal(t, http.StatusForbidden, deleteResp.StatusCode)
 	deleteResp.Body.Close()
 
-	missingResp := doJSON(t, http.MethodGet, baseURL+"/does-not-exist", token, nil)
+	missingResp := doJSON(t, http.MethodGet, baseURL+"/999999999999999999", token, nil)
 	require.Equal(t, http.StatusNotFound, missingResp.StatusCode)
 	missingResp.Body.Close()
 

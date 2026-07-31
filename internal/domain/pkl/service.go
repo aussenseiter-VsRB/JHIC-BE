@@ -11,7 +11,7 @@ import (
 )
 
 type Users interface {
-	ByID(ctx context.Context, id string) (*user.User, error)
+	ByID(ctx context.Context, id id.ID) (*user.User, error)
 	FindByPosition(ctx context.Context, position, class, jurusan string) (*user.User, error)
 }
 
@@ -24,7 +24,7 @@ func NewService(repo Repository, users Users) *Service {
 	return &Service{repo: repo, users: users}
 }
 
-func (s *Service) Create(ctx context.Context, requesterID, company, location string, startDate, endDate time.Time, description string) (*PklRequest, error) {
+func (s *Service) Create(ctx context.Context, requesterID id.ID, company, location string, startDate, endDate time.Time, description string) (*PklRequest, error) {
 	requester, err := s.users.ByID(ctx, requesterID)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (s *Service) Create(ctx context.Context, requesterID, company, location str
 	return req, nil
 }
 
-func (s *Service) List(ctx context.Context, callerID, role string) ([]PklRequest, error) {
+func (s *Service) List(ctx context.Context, callerID id.ID, role string) ([]PklRequest, error) {
 	var list []PklRequest
 	var err error
 	switch role {
@@ -113,7 +113,7 @@ func (s *Service) List(ctx context.Context, callerID, role string) ([]PklRequest
 	return list, nil
 }
 
-func (s *Service) Get(ctx context.Context, callerID, role, requestID string) (*PklRequest, error) {
+func (s *Service) Get(ctx context.Context, callerID id.ID, role string, requestID id.ID) (*PklRequest, error) {
 	req, err := s.repo.ByID(ctx, requestID)
 	if err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func (s *Service) Get(ctx context.Context, callerID, role, requestID string) (*P
 	return req, nil
 }
 
-func (s *Service) Decide(ctx context.Context, callerID, requestID, decision, note string) (*PklRequest, error) {
+func (s *Service) Decide(ctx context.Context, callerID id.ID, requestID id.ID, decision, note string) (*PklRequest, error) {
 	req, err := s.repo.ByID(ctx, requestID)
 	if err != nil {
 		return nil, err
@@ -223,7 +223,7 @@ func (s *Service) Decide(ctx context.Context, callerID, requestID, decision, not
 	return req, nil
 }
 
-func (s *Service) Cancel(ctx context.Context, callerID, requestID, reason string) (*PklRequest, error) {
+func (s *Service) Cancel(ctx context.Context, callerID id.ID, requestID id.ID, reason string) (*PklRequest, error) {
 	if reason == "" {
 		return nil, fmt.Errorf("cancellation reason is required")
 	}
@@ -249,6 +249,6 @@ func (s *Service) Cancel(ctx context.Context, callerID, requestID, reason string
 	return req, nil
 }
 
-func isApprover(userID string, steps []Step) bool {
+func isApprover(userID id.ID, steps []Step) bool {
 	return slices.ContainsFunc(steps, func(s Step) bool { return s.ApproverID == userID })
 }

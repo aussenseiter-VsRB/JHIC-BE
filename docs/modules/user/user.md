@@ -15,7 +15,7 @@ The `user` domain manages user profiles and role assignments. It reads from the 
 
 ```go
 type User struct {
-    ID        string    `json:"id"`
+    ID        id.ID     `json:"id"`
     Email     string    `json:"email"`
     Name      string    `json:"name"`
     Role      string    `json:"role"`

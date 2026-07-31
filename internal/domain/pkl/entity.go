@@ -1,6 +1,10 @@
 package pkl
 
-import "time"
+import (
+	"time"
+
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
+)
 
 const (
 	StatusPending     = "pending"
@@ -31,8 +35,8 @@ const DecisionNeedsAction = "needs_further_action"
 var ApprovalOrder = []string{PositionWaliKelas, PositionBK, PositionKesiswaan, PositionKaprog}
 
 type PklRequest struct {
-	ID           string    `json:"id"`
-	RequesterID  string    `json:"requester_id"`
+	ID           id.ID     `json:"id"`
+	RequesterID  id.ID     `json:"requester_id"`
 	Company      string    `json:"company"`
 	Location     string    `json:"location"`
 	StartDate    time.Time `json:"start_date"`
@@ -47,10 +51,10 @@ type PklRequest struct {
 }
 
 type Step struct {
-	ID         string     `json:"id"`
-	RequestID  string     `json:"request_id"`
+	ID         id.ID      `json:"id"`
+	RequestID  id.ID      `json:"request_id"`
 	Position   string     `json:"position"`
-	ApproverID string     `json:"approver_id"`
+	ApproverID id.ID      `json:"approver_id"`
 	Status     string     `json:"status"`
 	Note       string     `json:"note,omitempty"`
 	Sequence   int        `json:"sequence"`

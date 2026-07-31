@@ -24,6 +24,7 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/storage"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/joho/godotenv"
 )
 
@@ -78,7 +79,7 @@ func main() {
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
 	roleCheck := userSvc.ByID
-	roleChecker := func(ctx context.Context, userID string) (string, error) {
+	roleChecker := func(ctx context.Context, userID id.ID) (string, error) {
 		u, err := roleCheck(ctx, userID)
 		if err != nil {
 			return "", err

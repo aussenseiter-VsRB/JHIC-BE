@@ -7,6 +7,7 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita/mocks"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ func TestService_List(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		expected := []berita.Berita{{ID: "b1", Title: "First"}, {ID: "b2", Title: "Second"}}
+		expected := []berita.Berita{{ID: id.ID(1), Title: "First"}, {ID: id.ID(2), Title: "Second"}}
 		repo.On("List", mock.Anything).Return(expected, nil)
 
 		svc := berita.NewService(repo)
@@ -39,11 +40,11 @@ func TestService_ByID(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		expected := &berita.Berita{ID: "b1", Title: "First"}
-		repo.On("ByID", mock.Anything, "b1").Return(expected, nil)
+		expected := &berita.Berita{ID: id.ID(1), Title: "First"}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(expected, nil)
 
 		svc := berita.NewService(repo)
-		got, err := svc.ByID(context.Background(), "b1")
+		got, err := svc.ByID(context.Background(), id.ID(1))
 		require.NoError(t, err)
 		require.Equal(t, expected, got)
 	})
@@ -51,10 +52,10 @@ func TestService_ByID(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*berita.Berita)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*berita.Berita)(nil), nil)
 
 		svc := berita.NewService(repo)
-		got, err := svc.ByID(context.Background(), "missing")
+		got, err := svc.ByID(context.Background(), id.ID(99))
 		require.NoError(t, err)
 		require.Nil(t, got)
 	})
@@ -62,10 +63,10 @@ func TestService_ByID(t *testing.T) {
 	t.Run("repository error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "b1").Return((*berita.Berita)(nil), errors.New("db down"))
+		repo.On("ByID", mock.Anything, id.ID(1)).Return((*berita.Berita)(nil), errors.New("db down"))
 
 		svc := berita.NewService(repo)
-		_, err := svc.ByID(context.Background(), "b1")
+		_, err := svc.ByID(context.Background(), id.ID(1))
 		require.EqualError(t, err, "db down")
 	})
 }
@@ -75,14 +76,14 @@ func TestService_Create(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
 		repo.On("Create", mock.Anything, mock.MatchedBy(func(b *berita.Berita) bool {
-			return b.ID != "" && b.AuthorID == "u1" && b.Title == "News" && b.Content == "Body" && !b.CreatedAt.IsZero() && !b.UpdatedAt.IsZero()
+			return b.ID != 0 && b.AuthorID == id.ID(10) && b.Title == "News" && b.Content == "Body" && !b.CreatedAt.IsZero() && !b.UpdatedAt.IsZero()
 		})).Return(nil)
 
 		svc := berita.NewService(repo)
-		got, err := svc.Create(context.Background(), "u1", "News", "Body")
+		got, err := svc.Create(context.Background(), id.ID(10), "News", "Body")
 		require.NoError(t, err)
 		require.NotEmpty(t, got.ID)
-		require.Equal(t, "u1", got.AuthorID)
+		require.Equal(t, id.ID(10), got.AuthorID)
 		require.Equal(t, "News", got.Title)
 	})
 
@@ -92,7 +93,7 @@ func TestService_Create(t *testing.T) {
 		repo.On("Create", mock.Anything, mock.Anything).Return(errors.New("insert failed"))
 
 		svc := berita.NewService(repo)
-		_, err := svc.Create(context.Background(), "u1", "News", "Body")
+		_, err := svc.Create(context.Background(), id.ID(10), "News", "Body")
 		require.EqualError(t, err, "insert failed")
 	})
 }
@@ -101,14 +102,14 @@ func TestService_Update(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1", Title: "Old", Content: "Old body"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10), Title: "Old", Content: "Old body"}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 		repo.On("Update", mock.Anything, mock.MatchedBy(func(b *berita.Berita) bool {
-			return b.ID == "b1" && b.Title == "New" && b.Content == "New body" && !b.UpdatedAt.IsZero()
+			return b.ID == id.ID(1) && b.Title == "New" && b.Content == "New body" && !b.UpdatedAt.IsZero()
 		})).Return(nil)
 
 		svc := berita.NewService(repo)
-		got, err := svc.Update(context.Background(), "b1", "u1", "New", "New body")
+		got, err := svc.Update(context.Background(), id.ID(1), id.ID(10), "New", "New body")
 		require.NoError(t, err)
 		require.Equal(t, "New", got.Title)
 	})
@@ -116,43 +117,43 @@ func TestService_Update(t *testing.T) {
 	t.Run("berita not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*berita.Berita)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*berita.Berita)(nil), nil)
 
 		svc := berita.NewService(repo)
-		_, err := svc.Update(context.Background(), "missing", "u1", "New", "Body")
+		_, err := svc.Update(context.Background(), id.ID(99), id.ID(10), "New", "Body")
 		require.EqualError(t, err, "berita not found")
 	})
 
 	t.Run("forbidden not author", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1", Title: "Old"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10), Title: "Old"}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 
 		svc := berita.NewService(repo)
-		_, err := svc.Update(context.Background(), "b1", "intruder", "New", "Body")
+		_, err := svc.Update(context.Background(), id.ID(1), id.ID(11), "New", "Body")
 		require.EqualError(t, err, "forbidden: not the author")
 	})
 
 	t.Run("by id error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "b1").Return((*berita.Berita)(nil), errors.New("db down"))
+		repo.On("ByID", mock.Anything, id.ID(1)).Return((*berita.Berita)(nil), errors.New("db down"))
 
 		svc := berita.NewService(repo)
-		_, err := svc.Update(context.Background(), "b1", "u1", "New", "Body")
+		_, err := svc.Update(context.Background(), id.ID(1), id.ID(10), "New", "Body")
 		require.EqualError(t, err, "db down")
 	})
 
 	t.Run("update error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10)}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 		repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update failed"))
 
 		svc := berita.NewService(repo)
-		_, err := svc.Update(context.Background(), "b1", "u1", "New", "Body")
+		_, err := svc.Update(context.Background(), id.ID(1), id.ID(10), "New", "Body")
 		require.EqualError(t, err, "update failed")
 	})
 }
@@ -161,54 +162,54 @@ func TestService_Delete(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
-		repo.On("Delete", mock.Anything, "b1").Return(nil)
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10)}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
+		repo.On("Delete", mock.Anything, id.ID(1)).Return(nil)
 
 		svc := berita.NewService(repo)
-		require.NoError(t, svc.Delete(context.Background(), "b1", "u1"))
+		require.NoError(t, svc.Delete(context.Background(), id.ID(1), id.ID(10)))
 	})
 
 	t.Run("berita not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*berita.Berita)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*berita.Berita)(nil), nil)
 
 		svc := berita.NewService(repo)
-		err := svc.Delete(context.Background(), "missing", "u1")
+		err := svc.Delete(context.Background(), id.ID(99), id.ID(10))
 		require.EqualError(t, err, "berita not found")
 	})
 
 	t.Run("forbidden not author", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10)}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 
 		svc := berita.NewService(repo)
-		err := svc.Delete(context.Background(), "b1", "intruder")
+		err := svc.Delete(context.Background(), id.ID(1), id.ID(11))
 		require.EqualError(t, err, "forbidden: not the author")
 	})
 
 	t.Run("by id error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "b1").Return((*berita.Berita)(nil), errors.New("db down"))
+		repo.On("ByID", mock.Anything, id.ID(1)).Return((*berita.Berita)(nil), errors.New("db down"))
 
 		svc := berita.NewService(repo)
-		err := svc.Delete(context.Background(), "b1", "u1")
+		err := svc.Delete(context.Background(), id.ID(1), id.ID(10))
 		require.EqualError(t, err, "db down")
 	})
 
 	t.Run("delete error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
-		repo.On("Delete", mock.Anything, "b1").Return(errors.New("delete failed"))
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10)}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
+		repo.On("Delete", mock.Anything, id.ID(1)).Return(errors.New("delete failed"))
 
 		svc := berita.NewService(repo)
-		err := svc.Delete(context.Background(), "b1", "u1")
+		err := svc.Delete(context.Background(), id.ID(1), id.ID(10))
 		require.EqualError(t, err, "delete failed")
 	})
 }
@@ -217,48 +218,48 @@ func TestService_SetImage(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10)}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 		repo.On("Update", mock.Anything, mock.MatchedBy(func(b *berita.Berita) bool {
-			return b.ID == "b1" && b.ImageURL == "berita/b1/photo.png" && !b.UpdatedAt.IsZero()
+			return b.ID == id.ID(1) && b.ImageURL == "berita/1/photo.png" && !b.UpdatedAt.IsZero()
 		})).Return(nil)
 
 		svc := berita.NewService(repo)
-		got, err := svc.SetImage(context.Background(), "b1", "u1", "berita/b1/photo.png")
+		got, err := svc.SetImage(context.Background(), id.ID(1), id.ID(10), "berita/1/photo.png")
 		require.NoError(t, err)
-		require.Equal(t, "berita/b1/photo.png", got.ImageURL)
+		require.Equal(t, "berita/1/photo.png", got.ImageURL)
 	})
 
 	t.Run("berita not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*berita.Berita)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*berita.Berita)(nil), nil)
 
 		svc := berita.NewService(repo)
-		_, err := svc.SetImage(context.Background(), "missing", "u1", "berita/x.png")
+		_, err := svc.SetImage(context.Background(), id.ID(99), id.ID(10), "berita/x.png")
 		require.EqualError(t, err, "berita not found")
 	})
 
 	t.Run("forbidden not author", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10)}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 
 		svc := berita.NewService(repo)
-		_, err := svc.SetImage(context.Background(), "b1", "intruder", "berita/b1/x.png")
+		_, err := svc.SetImage(context.Background(), id.ID(1), id.ID(11), "berita/1/x.png")
 		require.EqualError(t, err, "forbidden: not the author")
 	})
 
 	t.Run("update error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &berita.Berita{ID: "b1", AuthorID: "u1"}
-		repo.On("ByID", mock.Anything, "b1").Return(existing, nil)
+		existing := &berita.Berita{ID: id.ID(1), AuthorID: id.ID(10)}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 		repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update failed"))
 
 		svc := berita.NewService(repo)
-		_, err := svc.SetImage(context.Background(), "b1", "u1", "berita/b1/x.png")
+		_, err := svc.SetImage(context.Background(), id.ID(1), id.ID(10), "berita/1/x.png")
 		require.EqualError(t, err, "update failed")
 	})
 }

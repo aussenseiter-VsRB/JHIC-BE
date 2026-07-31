@@ -7,6 +7,7 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user/mocks"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ func TestService_List(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		expected := []user.User{{ID: "u1", Email: "a@example.com"}, {ID: "u2", Email: "b@example.com"}}
+		expected := []user.User{{ID: id.ID(1), Email: "a@example.com"}, {ID: id.ID(2), Email: "b@example.com"}}
 		repo.On("List", mock.Anything).Return(expected, nil)
 
 		svc := user.NewService(repo)
@@ -39,11 +40,11 @@ func TestService_ByID(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		expected := &user.User{ID: "u1", Email: "a@example.com"}
-		repo.On("ByID", mock.Anything, "u1").Return(expected, nil)
+		expected := &user.User{ID: id.ID(1), Email: "a@example.com"}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(expected, nil)
 
 		svc := user.NewService(repo)
-		got, err := svc.ByID(context.Background(), "u1")
+		got, err := svc.ByID(context.Background(), id.ID(1))
 		require.NoError(t, err)
 		require.Equal(t, expected, got)
 	})
@@ -51,10 +52,10 @@ func TestService_ByID(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*user.User)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*user.User)(nil), nil)
 
 		svc := user.NewService(repo)
-		got, err := svc.ByID(context.Background(), "missing")
+		got, err := svc.ByID(context.Background(), id.ID(99))
 		require.NoError(t, err)
 		require.Nil(t, got)
 	})
@@ -62,10 +63,10 @@ func TestService_ByID(t *testing.T) {
 	t.Run("repository error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "u1").Return((*user.User)(nil), errors.New("db down"))
+		repo.On("ByID", mock.Anything, id.ID(1)).Return((*user.User)(nil), errors.New("db down"))
 
 		svc := user.NewService(repo)
-		_, err := svc.ByID(context.Background(), "u1")
+		_, err := svc.ByID(context.Background(), id.ID(1))
 		require.EqualError(t, err, "db down")
 	})
 }
@@ -74,15 +75,15 @@ func TestService_Update(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &user.User{ID: "u1", Email: "a@example.com", Name: "Old", AvatarURL: ""}
-		repo.On("ByID", mock.Anything, "u1").Return(existing, nil)
+		existing := &user.User{ID: id.ID(1), Email: "a@example.com", Name: "Old", AvatarURL: ""}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 		repo.On("Update", mock.Anything, mock.MatchedBy(func(u *user.User) bool {
-			return u.ID == "u1" && u.Name == "New" && u.AvatarURL == "https://cdn.example.com/a.png" &&
+			return u.ID == id.ID(1) && u.Name == "New" && u.AvatarURL == "https://cdn.example.com/a.png" &&
 				u.Class == "PPLG 1" && u.Jurusan == "PPLG" && u.Position == "" && !u.UpdatedAt.IsZero()
 		})).Return(nil)
 
 		svc := user.NewService(repo)
-		got, err := svc.Update(context.Background(), "u1", "New", "https://cdn.example.com/a.png", "PPLG 1", "PPLG", "")
+		got, err := svc.Update(context.Background(), id.ID(1), "New", "https://cdn.example.com/a.png", "PPLG 1", "PPLG", "")
 		require.NoError(t, err)
 		require.Equal(t, "New", got.Name)
 		require.Equal(t, "https://cdn.example.com/a.png", got.AvatarURL)
@@ -92,43 +93,43 @@ func TestService_Update(t *testing.T) {
 	t.Run("position only valid for guru", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &user.User{ID: "u1", Role: "user"}
-		repo.On("ByID", mock.Anything, "u1").Return(existing, nil)
+		existing := &user.User{ID: id.ID(1), Role: "user"}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 
 		svc := user.NewService(repo)
-		_, err := svc.Update(context.Background(), "u1", "New", "", "", "", "wali_kelas")
+		_, err := svc.Update(context.Background(), id.ID(1), "New", "", "", "", "wali_kelas")
 		require.EqualError(t, err, "position is only valid for role guru")
 	})
 
 	t.Run("user not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*user.User)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*user.User)(nil), nil)
 
 		svc := user.NewService(repo)
-		_, err := svc.Update(context.Background(), "missing", "New", "", "", "", "")
+		_, err := svc.Update(context.Background(), id.ID(99), "New", "", "", "", "")
 		require.EqualError(t, err, "user not found")
 	})
 
 	t.Run("by id error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "u1").Return((*user.User)(nil), errors.New("db down"))
+		repo.On("ByID", mock.Anything, id.ID(1)).Return((*user.User)(nil), errors.New("db down"))
 
 		svc := user.NewService(repo)
-		_, err := svc.Update(context.Background(), "u1", "New", "", "", "", "")
+		_, err := svc.Update(context.Background(), id.ID(1), "New", "", "", "", "")
 		require.EqualError(t, err, "db down")
 	})
 
 	t.Run("update error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &user.User{ID: "u1", Email: "a@example.com"}
-		repo.On("ByID", mock.Anything, "u1").Return(existing, nil)
+		existing := &user.User{ID: id.ID(1), Email: "a@example.com"}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
 		repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update failed"))
 
 		svc := user.NewService(repo)
-		_, err := svc.Update(context.Background(), "u1", "New", "", "", "", "")
+		_, err := svc.Update(context.Background(), id.ID(1), "New", "", "", "", "")
 		require.EqualError(t, err, "update failed")
 	})
 }
@@ -139,7 +140,7 @@ func TestService_Create(t *testing.T) {
 
 		repo.On("ByEmail", mock.Anything, "guru@example.com").Return((*user.User)(nil), nil)
 		repo.On("Create", mock.Anything, mock.MatchedBy(func(u *user.User) bool {
-			return u.Email == "guru@example.com" && u.Role == "guru" && u.Position == "wali_kelas" && u.Class == "PPLG 1" && !u.CreatedAt.IsZero()
+			return u.ID != 0 && u.Email == "guru@example.com" && u.Role == "guru" && u.Position == "wali_kelas" && u.Class == "PPLG 1" && !u.CreatedAt.IsZero()
 		}), mock.MatchedBy(func(h string) bool { return len(h) > 0 })).Return(nil)
 
 		svc := user.NewService(repo)
@@ -184,7 +185,7 @@ func TestService_Create(t *testing.T) {
 	t.Run("duplicate email", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByEmail", mock.Anything, "a@example.com").Return(&user.User{ID: "u1"}, nil)
+		repo.On("ByEmail", mock.Anything, "a@example.com").Return(&user.User{ID: id.ID(1)}, nil)
 
 		svc := user.NewService(repo)
 		_, err := svc.Create(context.Background(), "a@example.com", "secret", "Name", "user", "", "", "")
@@ -207,51 +208,51 @@ func TestService_UpdateRole(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &user.User{ID: "u1", Role: "user"}
-		repo.On("ByID", mock.Anything, "u1").Return(existing, nil)
-		repo.On("UpdateRole", mock.Anything, "u1", "admin").Return(nil)
+		existing := &user.User{ID: id.ID(1), Role: "user"}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
+		repo.On("UpdateRole", mock.Anything, id.ID(1), "admin").Return(nil)
 
 		svc := user.NewService(repo)
-		require.NoError(t, svc.UpdateRole(context.Background(), "u1", "admin"))
+		require.NoError(t, svc.UpdateRole(context.Background(), id.ID(1), "admin"))
 	})
 
 	t.Run("invalid role", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
 		svc := user.NewService(repo)
-		err := svc.UpdateRole(context.Background(), "u1", "superuser")
+		err := svc.UpdateRole(context.Background(), id.ID(1), "superuser")
 		require.EqualError(t, err, "invalid role: must be one of [jurnal guru admin user]")
 	})
 
 	t.Run("user not found", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "missing").Return((*user.User)(nil), nil)
+		repo.On("ByID", mock.Anything, id.ID(99)).Return((*user.User)(nil), nil)
 
 		svc := user.NewService(repo)
-		err := svc.UpdateRole(context.Background(), "missing", "admin")
+		err := svc.UpdateRole(context.Background(), id.ID(99), "admin")
 		require.EqualError(t, err, "user not found")
 	})
 
 	t.Run("by id error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("ByID", mock.Anything, "u1").Return((*user.User)(nil), errors.New("db down"))
+		repo.On("ByID", mock.Anything, id.ID(1)).Return((*user.User)(nil), errors.New("db down"))
 
 		svc := user.NewService(repo)
-		err := svc.UpdateRole(context.Background(), "u1", "admin")
+		err := svc.UpdateRole(context.Background(), id.ID(1), "admin")
 		require.EqualError(t, err, "db down")
 	})
 
 	t.Run("update role error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		existing := &user.User{ID: "u1", Role: "user"}
-		repo.On("ByID", mock.Anything, "u1").Return(existing, nil)
-		repo.On("UpdateRole", mock.Anything, "u1", "admin").Return(errors.New("update failed"))
+		existing := &user.User{ID: id.ID(1), Role: "user"}
+		repo.On("ByID", mock.Anything, id.ID(1)).Return(existing, nil)
+		repo.On("UpdateRole", mock.Anything, id.ID(1), "admin").Return(errors.New("update failed"))
 
 		svc := user.NewService(repo)
-		err := svc.UpdateRole(context.Background(), "u1", "admin")
+		err := svc.UpdateRole(context.Background(), id.ID(1), "admin")
 		require.EqualError(t, err, "update failed")
 	})
 }
@@ -260,18 +261,18 @@ func TestService_Delete(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("Delete", mock.Anything, "u1").Return(nil)
+		repo.On("Delete", mock.Anything, id.ID(1)).Return(nil)
 
 		svc := user.NewService(repo)
-		require.NoError(t, svc.Delete(context.Background(), "u1"))
+		require.NoError(t, svc.Delete(context.Background(), id.ID(1)))
 	})
 
 	t.Run("repository error", func(t *testing.T) {
 		repo := mocks.NewRepository(t)
 
-		repo.On("Delete", mock.Anything, "u1").Return(errors.New("delete failed"))
+		repo.On("Delete", mock.Anything, id.ID(1)).Return(errors.New("delete failed"))
 
 		svc := user.NewService(repo)
-		require.EqualError(t, svc.Delete(context.Background(), "u1"), "delete failed")
+		require.EqualError(t, svc.Delete(context.Background(), id.ID(1)), "delete failed")
 	})
 }

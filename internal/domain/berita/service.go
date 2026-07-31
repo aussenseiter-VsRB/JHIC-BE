@@ -20,11 +20,11 @@ func (s *Service) List(ctx context.Context) ([]Berita, error) {
 	return s.repo.List(ctx)
 }
 
-func (s *Service) ByID(ctx context.Context, id string) (*Berita, error) {
+func (s *Service) ByID(ctx context.Context, id id.ID) (*Berita, error) {
 	return s.repo.ByID(ctx, id)
 }
 
-func (s *Service) Create(ctx context.Context, authorID, title, content string) (*Berita, error) {
+func (s *Service) Create(ctx context.Context, authorID id.ID, title, content string) (*Berita, error) {
 	now := time.Now().UTC()
 	b := &Berita{
 		ID:        id.New(),
@@ -40,7 +40,7 @@ func (s *Service) Create(ctx context.Context, authorID, title, content string) (
 	return b, nil
 }
 
-func (s *Service) Update(ctx context.Context, id, callerID, title, content string) (*Berita, error) {
+func (s *Service) Update(ctx context.Context, id, callerID id.ID, title, content string) (*Berita, error) {
 	b, err := s.repo.ByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (s *Service) Update(ctx context.Context, id, callerID, title, content strin
 	return b, nil
 }
 
-func (s *Service) Delete(ctx context.Context, id, callerID string) error {
+func (s *Service) Delete(ctx context.Context, id, callerID id.ID) error {
 	b, err := s.repo.ByID(ctx, id)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (s *Service) Delete(ctx context.Context, id, callerID string) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *Service) SetImage(ctx context.Context, id, callerID, imageURL string) (*Berita, error) {
+func (s *Service) SetImage(ctx context.Context, id, callerID id.ID, imageURL string) (*Berita, error) {
 	b, err := s.repo.ByID(ctx, id)
 	if err != nil {
 		return nil, err

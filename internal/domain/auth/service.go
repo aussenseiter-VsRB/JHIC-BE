@@ -77,7 +77,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 	return user, token, nil
 }
 
-func (s *Service) Logout(ctx context.Context, userID string) error {
+func (s *Service) Logout(ctx context.Context, userID id.ID) error {
 	return s.sessions.DeleteByUserID(ctx, userID)
 }
 
@@ -85,22 +85,22 @@ func (s *Service) ValidateToken(ctx context.Context, token string) (*Session, er
 	return s.sessions.ByToken(ctx, token)
 }
 
-type TokenValidator func(ctx context.Context, token string) (string, error)
+type TokenValidator func(ctx context.Context, token string) (id.ID, error)
 
 func NewTokenValidator(repo SessionRepository) TokenValidator {
-	return func(ctx context.Context, token string) (string, error) {
+	return func(ctx context.Context, token string) (id.ID, error) {
 		session, err := repo.ByToken(ctx, token)
 		if err != nil {
-			return "", err
+			return 0, err
 		}
 		if session == nil {
-			return "", nil
+			return 0, nil
 		}
 		return session.UserID, nil
 	}
 }
 
-func (s *Service) generateToken(ctx context.Context, userID string) (string, error) {
+func (s *Service) generateToken(ctx context.Context, userID id.ID) (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("generate token: %w", err)

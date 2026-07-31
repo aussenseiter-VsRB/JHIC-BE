@@ -13,12 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func seedRequest(t *testing.T, requesterID string) (*pkl.PklRequest, []pkl.Step) {
+func seedRequest(t *testing.T, requesterID id.ID) (*pkl.PklRequest, []pkl.Step) {
 	t.Helper()
 	now := time.Now().UTC()
 
-	for _, pos := range positions {
-		seedGuru(t, "guru-"+pos, pos+"@example.com", pos)
+	for i, pos := range positions {
+		seedGuru(t, id.ID(100+i), pos+"@example.com", pos)
 	}
 
 	req := &pkl.PklRequest{
@@ -34,14 +34,13 @@ func seedRequest(t *testing.T, requesterID string) (*pkl.PklRequest, []pkl.Step)
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	positions := []string{"wali_kelas", "bk", "kesiswaan", "kaprog"}
-	steps := make([]pkl.Step, 0, 4)
+	steps := make([]pkl.Step, 0, len(positions))
 	for i, pos := range positions {
 		steps = append(steps, pkl.Step{
 			ID:         id.New(),
 			RequestID:  req.ID,
 			Position:   pos,
-			ApproverID: "guru-" + pos,
+			ApproverID: id.ID(100 + i),
 			Status:     pkl.StepPending,
 			Sequence:   i + 1,
 			CreatedAt:  now,
@@ -56,9 +55,9 @@ func TestRepository_CreateRequest(t *testing.T) {
 	ctx := context.Background()
 	repo := pg.NewRepository(pool)
 
-	seedUser(t, "student-1", "student@example.com", "PPLG 1", "PPLG")
+	seedUser(t, id.ID(10), "student@example.com", "PPLG 1", "PPLG")
 
-	req, steps := seedRequest(t, "student-1")
+	req, steps := seedRequest(t, id.ID(10))
 	require.NoError(t, repo.CreateRequest(ctx, req, steps))
 
 	got, err := repo.ByID(ctx, req.ID)
@@ -74,7 +73,7 @@ func TestRepository_CreateRequest(t *testing.T) {
 	for i, s := range storedSteps {
 		require.Equal(t, i+1, s.Sequence)
 		require.Equal(t, positions[i], s.Position)
-		require.Equal(t, "guru-"+positions[i], s.ApproverID)
+		require.Equal(t, id.ID(100+i), s.ApproverID)
 		require.Equal(t, pkl.StepPending, s.Status)
 	}
 }
@@ -84,13 +83,13 @@ func TestRepository_ListByRequester(t *testing.T) {
 	ctx := context.Background()
 	repo := pg.NewRepository(pool)
 
-	seedUser(t, "student-1", "student@example.com", "PPLG 1", "PPLG")
-	req1, steps1 := seedRequest(t, "student-1")
-	req2, steps2 := seedRequest(t, "student-1")
+	seedUser(t, id.ID(10), "student@example.com", "PPLG 1", "PPLG")
+	req1, steps1 := seedRequest(t, id.ID(10))
+	req2, steps2 := seedRequest(t, id.ID(10))
 	require.NoError(t, repo.CreateRequest(ctx, req1, steps1))
 	require.NoError(t, repo.CreateRequest(ctx, req2, steps2))
 
-	list, err := repo.ListByRequester(ctx, "student-1")
+	list, err := repo.ListByRequester(ctx, id.ID(10))
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 }
@@ -100,18 +99,18 @@ func TestRepository_ListForApprover(t *testing.T) {
 	ctx := context.Background()
 	repo := pg.NewRepository(pool)
 
-	seedUser(t, "student-1", "student@example.com", "PPLG 1", "PPLG")
+	seedUser(t, id.ID(10), "student@example.com", "PPLG 1", "PPLG")
 
-	req1, steps1 := seedRequest(t, "student-1")
+	req1, steps1 := seedRequest(t, id.ID(10))
 	require.NoError(t, repo.CreateRequest(ctx, req1, steps1))
-	req2, steps2 := seedRequest(t, "student-1")
+	req2, steps2 := seedRequest(t, id.ID(10))
 	require.NoError(t, repo.CreateRequest(ctx, req2, steps2))
 
-	list, err := repo.ListForApprover(ctx, "guru-bk")
+	list, err := repo.ListForApprover(ctx, id.ID(101))
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 
-	unrelated, err := repo.ListForApprover(ctx, "guru-other")
+	unrelated, err := repo.ListForApprover(ctx, id.ID(199))
 	require.NoError(t, err)
 	require.Len(t, unrelated, 0)
 }
@@ -121,8 +120,8 @@ func TestRepository_Decide(t *testing.T) {
 	ctx := context.Background()
 	repo := pg.NewRepository(pool)
 
-	seedUser(t, "student-1", "student@example.com", "PPLG 1", "PPLG")
-	req, steps := seedRequest(t, "student-1")
+	seedUser(t, id.ID(10), "student@example.com", "PPLG 1", "PPLG")
+	req, steps := seedRequest(t, id.ID(10))
 	require.NoError(t, repo.CreateRequest(ctx, req, steps))
 
 	now := time.Now().UTC()
@@ -150,8 +149,8 @@ func TestRepository_Decide_Conflict(t *testing.T) {
 	ctx := context.Background()
 	repo := pg.NewRepository(pool)
 
-	seedUser(t, "student-1", "student@example.com", "PPLG 1", "PPLG")
-	req, steps := seedRequest(t, "student-1")
+	seedUser(t, id.ID(10), "student@example.com", "PPLG 1", "PPLG")
+	req, steps := seedRequest(t, id.ID(10))
 	require.NoError(t, repo.CreateRequest(ctx, req, steps))
 
 	now := time.Now().UTC()
@@ -171,8 +170,8 @@ func TestRepository_Cancel(t *testing.T) {
 	ctx := context.Background()
 	repo := pg.NewRepository(pool)
 
-	seedUser(t, "student-1", "student@example.com", "PPLG 1", "PPLG")
-	req, steps := seedRequest(t, "student-1")
+	seedUser(t, id.ID(10), "student@example.com", "PPLG 1", "PPLG")
+	req, steps := seedRequest(t, id.ID(10))
 	require.NoError(t, repo.CreateRequest(ctx, req, steps))
 
 	req.Status = pkl.StatusCancelled
@@ -191,8 +190,8 @@ func TestRepository_Cancel_Conflict(t *testing.T) {
 	ctx := context.Background()
 	repo := pg.NewRepository(pool)
 
-	seedUser(t, "student-1", "student@example.com", "PPLG 1", "PPLG")
-	req, steps := seedRequest(t, "student-1")
+	seedUser(t, id.ID(10), "student@example.com", "PPLG 1", "PPLG")
+	req, steps := seedRequest(t, id.ID(10))
 	require.NoError(t, repo.CreateRequest(ctx, req, steps))
 
 	req.Status = pkl.StatusCancelled
@@ -209,10 +208,10 @@ func TestRepository_NoConnectionLeak(t *testing.T) {
 	ctx := context.Background()
 	before := pool.Stat().AcquiredConns()
 
-	seedUser(t, "student-1", "student@example.com", "PPLG 1", "PPLG")
+	seedUser(t, id.ID(10), "student@example.com", "PPLG 1", "PPLG")
 	repo := pg.NewRepository(pool)
 	for i := 0; i < 5; i++ {
-		req, steps := seedRequest(t, "student-1")
+		req, steps := seedRequest(t, id.ID(10))
 		require.NoError(t, repo.CreateRequest(ctx, req, steps))
 		_, err := repo.ByID(ctx, req.ID)
 		require.NoError(t, err)

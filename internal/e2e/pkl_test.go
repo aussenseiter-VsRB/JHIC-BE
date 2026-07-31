@@ -9,15 +9,16 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/stretchr/testify/require"
 )
 
 type guruAccount struct {
-	id    string
+	id    id.ID
 	token string
 }
 
-func createUserAsAdmin(t *testing.T, e *env, adminToken, email, role, class, jurusan, position string) string {
+func createUserAsAdmin(t *testing.T, e *env, adminToken, email, role, class, jurusan, position string) id.ID {
 	t.Helper()
 	body := map[string]string{
 		"email":    email,
@@ -65,8 +66,8 @@ func seedPKLApprovers(t *testing.T, e *env, adminToken string) map[string]guruAc
 		"kaprog":     {jurusan: "PPLG"},
 	}
 	for position, meta := range positions {
-		id := createUserAsAdmin(t, e, adminToken, position+"@example.com", "guru", meta.class, meta.jurusan, position)
-		gurus[position] = guruAccount{id: id, token: login(t, e, position+"@example.com")}
+		uid := createUserAsAdmin(t, e, adminToken, position+"@example.com", "guru", meta.class, meta.jurusan, position)
+		gurus[position] = guruAccount{id: uid, token: login(t, e, position+"@example.com")}
 	}
 	return gurus
 }
@@ -87,13 +88,13 @@ func createPKLRequest(t *testing.T, e *env, studentToken string) pkl.PklRequest 
 	return req
 }
 
-func decide(t *testing.T, e *env, guruToken, requestID, decision, note string) *http.Response {
+func decide(t *testing.T, e *env, guruToken string, requestID id.ID, decision, note string) *http.Response {
 	t.Helper()
 	body := map[string]string{"decision": decision}
 	if note != "" {
 		body["note"] = note
 	}
-	return doJSON(t, http.MethodPost, e.server.URL+"/api/v1/approval/pkl/"+requestID+"/decide", guruToken, body)
+	return doJSON(t, http.MethodPost, e.server.URL+"/api/v1/approval/pkl/"+requestID.String()+"/decide", guruToken, body)
 }
 
 func TestE2E_PKLFullApprovalFlow(t *testing.T) {
@@ -171,7 +172,7 @@ func TestE2E_PKLFullApprovalFlow(t *testing.T) {
 	require.Equal(t, http.StatusConflict, again.StatusCode)
 	again.Body.Close()
 
-	cancelAccepted := doJSON(t, http.MethodDelete, e.server.URL+"/api/v1/approval/pkl/"+req.ID, studentToken, map[string]string{"reason": "tidak jadi"})
+	cancelAccepted := doJSON(t, http.MethodDelete, e.server.URL+"/api/v1/approval/pkl/"+req.ID.String(), studentToken, map[string]string{"reason": "tidak jadi"})
 	require.Equal(t, http.StatusConflict, cancelAccepted.StatusCode)
 	cancelAccepted.Body.Close()
 
@@ -229,11 +230,11 @@ func TestE2E_PKLNeedsFurtherAction(t *testing.T) {
 	require.Equal(t, pkl.StatusPending, resumed.Status)
 	require.Equal(t, 2, resumed.CurrentStep)
 
-	noReason := doJSON(t, http.MethodDelete, e.server.URL+"/api/v1/approval/pkl/"+req.ID, studentToken, map[string]string{})
+	noReason := doJSON(t, http.MethodDelete, e.server.URL+"/api/v1/approval/pkl/"+req.ID.String(), studentToken, map[string]string{})
 	require.Equal(t, http.StatusBadRequest, noReason.StatusCode)
 	noReason.Body.Close()
 
-	cancelled := doJSON(t, http.MethodDelete, e.server.URL+"/api/v1/approval/pkl/"+req.ID, studentToken, map[string]string{"reason": "mundur"})
+	cancelled := doJSON(t, http.MethodDelete, e.server.URL+"/api/v1/approval/pkl/"+req.ID.String(), studentToken, map[string]string{"reason": "mundur"})
 	require.Equal(t, http.StatusOK, cancelled.StatusCode)
 	var cancelledReq pkl.PklRequest
 	require.NoError(t, json.NewDecoder(cancelled.Body).Decode(&cancelledReq))
@@ -270,7 +271,7 @@ func TestE2E_PKLReject(t *testing.T) {
 	require.Equal(t, http.StatusConflict, frozen.StatusCode)
 	frozen.Body.Close()
 
-	cancelRejected := doJSON(t, http.MethodDelete, e.server.URL+"/api/v1/approval/pkl/"+req.ID, studentToken, map[string]string{"reason": "tidak jadi"})
+	cancelRejected := doJSON(t, http.MethodDelete, e.server.URL+"/api/v1/approval/pkl/"+req.ID.String(), studentToken, map[string]string{"reason": "tidak jadi"})
 	require.Equal(t, http.StatusConflict, cancelRejected.StatusCode)
 	cancelRejected.Body.Close()
 
@@ -304,15 +305,15 @@ func TestE2E_PKLRoleAndVisibility(t *testing.T) {
 	otherSeesOwn.Body.Close()
 	require.Len(t, otherList, 0)
 
-	forbiddenGet := doJSON(t, http.MethodGet, e.server.URL+"/api/v1/approval/pkl/"+req.ID, otherStudentToken, nil)
+	forbiddenGet := doJSON(t, http.MethodGet, e.server.URL+"/api/v1/approval/pkl/"+req.ID.String(), otherStudentToken, nil)
 	require.Equal(t, http.StatusForbidden, forbiddenGet.StatusCode)
 	forbiddenGet.Body.Close()
 
-	foreignGet := doJSON(t, http.MethodGet, e.server.URL+"/api/v1/approval/pkl/"+req.ID, foreignKaprogToken, nil)
+	foreignGet := doJSON(t, http.MethodGet, e.server.URL+"/api/v1/approval/pkl/"+req.ID.String(), foreignKaprogToken, nil)
 	require.Equal(t, http.StatusForbidden, foreignGet.StatusCode)
 	foreignGet.Body.Close()
 
-	adminGet := doJSON(t, http.MethodGet, e.server.URL+"/api/v1/approval/pkl/"+req.ID, adminToken, nil)
+	adminGet := doJSON(t, http.MethodGet, e.server.URL+"/api/v1/approval/pkl/"+req.ID.String(), adminToken, nil)
 	require.Equal(t, http.StatusOK, adminGet.StatusCode)
 	adminGet.Body.Close()
 
@@ -328,7 +329,7 @@ func TestE2E_PKLRoleAndVisibility(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, noAuth.StatusCode)
 	noAuth.Body.Close()
 
-	missing := doJSON(t, http.MethodGet, e.server.URL+"/api/v1/approval/pkl/does-not-exist", studentToken, nil)
+	missing := doJSON(t, http.MethodGet, e.server.URL+"/api/v1/approval/pkl/999999999999999999", studentToken, nil)
 	require.Equal(t, http.StatusNotFound, missing.StatusCode)
 	missing.Body.Close()
 }

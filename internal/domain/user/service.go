@@ -26,7 +26,7 @@ func (s *Service) List(ctx context.Context) ([]User, error) {
 	return s.repo.List(ctx)
 }
 
-func (s *Service) ByID(ctx context.Context, id string) (*User, error) {
+func (s *Service) ByID(ctx context.Context, id id.ID) (*User, error) {
 	return s.repo.ByID(ctx, id)
 }
 
@@ -72,7 +72,7 @@ func (s *Service) Create(ctx context.Context, email, password, name, role, class
 	return u, nil
 }
 
-func (s *Service) Update(ctx context.Context, id, name, avatarURL, class, jurusan, position string) (*User, error) {
+func (s *Service) Update(ctx context.Context, id id.ID, name, avatarURL, class, jurusan, position string) (*User, error) {
 	user, err := s.repo.ByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func (s *Service) Update(ctx context.Context, id, name, avatarURL, class, jurusa
 	return user, nil
 }
 
-func (s *Service) UpdateRole(ctx context.Context, id, role string) error {
+func (s *Service) UpdateRole(ctx context.Context, id id.ID, role string) error {
 	if !slices.Contains(ValidRoles, role) {
 		return fmt.Errorf("invalid role: must be one of %v", ValidRoles)
 	}
@@ -109,7 +109,7 @@ func (s *Service) UpdateRole(ctx context.Context, id, role string) error {
 	return s.repo.UpdateRole(ctx, id, role)
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (s *Service) Delete(ctx context.Context, id id.ID) error {
 	return s.repo.Delete(ctx, id)
 }
 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -83,7 +85,7 @@ func main() {
 		seedUser{email: "kesiswaan@jhic.com", password: "guru123", name: "Guru Kesiswaan", role: "guru", position: "kesiswaan"},
 	)
 
-	var userIDs []string
+	var userIDs []id.ID
 	for _, u := range users {
 		uid := id.New()
 		hash, err := bcrypt.GenerateFromPassword([]byte(u.password), bcrypt.DefaultCost)
@@ -105,7 +107,11 @@ func main() {
 	}
 
 	for _, uid := range userIDs {
-		token := id.New()
+		tb := make([]byte, 32)
+		if _, err := rand.Read(tb); err != nil {
+			log.Fatalf("generate session token: %v", err)
+		}
+		token := hex.EncodeToString(tb)
 		_, err := pool.Exec(ctx,
 			`INSERT INTO sessions (token, user_id, created_at, expires_at)
 			 VALUES ($1, $2, $3, $4)`,

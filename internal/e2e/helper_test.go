@@ -22,6 +22,7 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/storage"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -147,7 +148,7 @@ func TestMain(m *testing.M) {
 
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
-	roleChecker := func(ctx context.Context, userID string) (string, error) {
+	roleChecker := func(ctx context.Context, userID id.ID) (string, error) {
 		u, err := userSvc.ByID(ctx, userID)
 		if err != nil {
 			return "", err
@@ -179,7 +180,7 @@ func startE2E(t *testing.T) *env {
 	return testEnv
 }
 
-func promoteToAdmin(t *testing.T, e *env, userID string) {
+func promoteToAdmin(t *testing.T, e *env, userID id.ID) {
 	t.Helper()
 	_, err := e.pool.Exec(context.Background(), `UPDATE users SET role = 'admin' WHERE id = $1`, userID)
 	require.NoError(t, err)

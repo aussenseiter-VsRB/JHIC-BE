@@ -7,6 +7,8 @@ import (
 
 	auth "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 
+	id "github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -46,7 +48,7 @@ func (_m *SessionRepository) ByToken(ctx context.Context, token string) (*auth.S
 }
 
 // Create provides a mock function with given fields: ctx, token, userID, expiresAt
-func (_m *SessionRepository) Create(ctx context.Context, token string, userID string, expiresAt int64) error {
+func (_m *SessionRepository) Create(ctx context.Context, token string, userID id.ID, expiresAt int64) error {
 	ret := _m.Called(ctx, token, userID, expiresAt)
 
 	if len(ret) == 0 {
@@ -54,7 +56,7 @@ func (_m *SessionRepository) Create(ctx context.Context, token string, userID st
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, id.ID, int64) error); ok {
 		r0 = rf(ctx, token, userID, expiresAt)
 	} else {
 		r0 = ret.Error(0)
@@ -64,7 +66,7 @@ func (_m *SessionRepository) Create(ctx context.Context, token string, userID st
 }
 
 // DeleteByUserID provides a mock function with given fields: ctx, userID
-func (_m *SessionRepository) DeleteByUserID(ctx context.Context, userID string) error {
+func (_m *SessionRepository) DeleteByUserID(ctx context.Context, userID id.ID) error {
 	ret := _m.Called(ctx, userID)
 
 	if len(ret) == 0 {
@@ -72,7 +74,7 @@ func (_m *SessionRepository) DeleteByUserID(ctx context.Context, userID string) 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, id.ID) error); ok {
 		r0 = rf(ctx, userID)
 	} else {
 		r0 = ret.Error(0)

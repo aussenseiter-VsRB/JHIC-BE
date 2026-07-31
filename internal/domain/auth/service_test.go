@@ -8,6 +8,7 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/mocks"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -20,7 +21,7 @@ func TestService_Register(t *testing.T) {
 
 		users.On("ByEmail", mock.Anything, "u@example.com").Return((*auth.User)(nil), nil)
 		users.On("Create", mock.Anything, mock.MatchedBy(func(u *auth.User) bool {
-			return u.ID != "" && u.Email == "u@example.com" && u.Name == "U" && u.Role == "user" && u.PasswordHash != ""
+			return u.ID != 0 && u.Email == "u@example.com" && u.Name == "U" && u.Role == "user" && u.PasswordHash != ""
 		})).Return(nil)
 		sessions.On("Create", mock.Anything,
 			mock.MatchedBy(func(token string) bool { return len(token) == 64 }),
@@ -42,7 +43,7 @@ func TestService_Register(t *testing.T) {
 		users := mocks.NewUserRepository(t)
 		sessions := mocks.NewSessionRepository(t)
 
-		existing := &auth.User{ID: "u1", Email: "u@example.com"}
+		existing := &auth.User{ID: id.ID(1), Email: "u@example.com"}
 		users.On("ByEmail", mock.Anything, "u@example.com").Return(existing, nil)
 
 		svc := auth.NewService(users, sessions)
@@ -95,18 +96,18 @@ func TestService_Login(t *testing.T) {
 		users := mocks.NewUserRepository(t)
 		sessions := mocks.NewSessionRepository(t)
 
-		existing := &auth.User{ID: "u1", Email: "u@example.com", PasswordHash: string(hash)}
+		existing := &auth.User{ID: id.ID(1), Email: "u@example.com", PasswordHash: string(hash)}
 		users.On("ByEmail", mock.Anything, "u@example.com").Return(existing, nil)
 		sessions.On("Create", mock.Anything,
 			mock.MatchedBy(func(token string) bool { return len(token) == 64 }),
-			"u1",
+			id.ID(1),
 			mock.Anything,
 		).Return(nil)
 
 		svc := auth.NewService(users, sessions)
 		u, token, err := svc.Login(context.Background(), "u@example.com", "secret-password")
 		require.NoError(t, err)
-		require.Equal(t, "u1", u.ID)
+		require.Equal(t, id.ID(1), u.ID)
 		require.Len(t, token, 64)
 	})
 
@@ -125,7 +126,7 @@ func TestService_Login(t *testing.T) {
 		users := mocks.NewUserRepository(t)
 		sessions := mocks.NewSessionRepository(t)
 
-		existing := &auth.User{ID: "u1", Email: "u@example.com", PasswordHash: string(hash)}
+		existing := &auth.User{ID: id.ID(1), Email: "u@example.com", PasswordHash: string(hash)}
 		users.On("ByEmail", mock.Anything, "u@example.com").Return(existing, nil)
 
 		svc := auth.NewService(users, sessions)
@@ -148,7 +149,7 @@ func TestService_Login(t *testing.T) {
 		users := mocks.NewUserRepository(t)
 		sessions := mocks.NewSessionRepository(t)
 
-		existing := &auth.User{ID: "u1", Email: "u@example.com", PasswordHash: string(hash)}
+		existing := &auth.User{ID: id.ID(1), Email: "u@example.com", PasswordHash: string(hash)}
 		users.On("ByEmail", mock.Anything, mock.Anything).Return(existing, nil)
 		sessions.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("session failed"))
 
@@ -163,20 +164,20 @@ func TestService_Logout(t *testing.T) {
 		users := mocks.NewUserRepository(t)
 		sessions := mocks.NewSessionRepository(t)
 
-		sessions.On("DeleteByUserID", mock.Anything, "u1").Return(nil)
+		sessions.On("DeleteByUserID", mock.Anything, id.ID(1)).Return(nil)
 
 		svc := auth.NewService(users, sessions)
-		require.NoError(t, svc.Logout(context.Background(), "u1"))
+		require.NoError(t, svc.Logout(context.Background(), id.ID(1)))
 	})
 
 	t.Run("delete error", func(t *testing.T) {
 		users := mocks.NewUserRepository(t)
 		sessions := mocks.NewSessionRepository(t)
 
-		sessions.On("DeleteByUserID", mock.Anything, "u1").Return(errors.New("delete failed"))
+		sessions.On("DeleteByUserID", mock.Anything, id.ID(1)).Return(errors.New("delete failed"))
 
 		svc := auth.NewService(users, sessions)
-		require.EqualError(t, svc.Logout(context.Background(), "u1"), "delete failed")
+		require.EqualError(t, svc.Logout(context.Background(), id.ID(1)), "delete failed")
 	})
 }
 
@@ -185,7 +186,7 @@ func TestService_ValidateToken(t *testing.T) {
 		users := mocks.NewUserRepository(t)
 		sessions := mocks.NewSessionRepository(t)
 
-		expected := &auth.Session{Token: "tok", UserID: "u1"}
+		expected := &auth.Session{Token: "tok", UserID: id.ID(1)}
 		sessions.On("ByToken", mock.Anything, "tok").Return(expected, nil)
 
 		svc := auth.NewService(users, sessions)
@@ -210,15 +211,15 @@ func TestNewTokenValidator(t *testing.T) {
 	t.Run("valid session returns user id", func(t *testing.T) {
 		sessions := mocks.NewSessionRepository(t)
 
-		sessions.On("ByToken", mock.Anything, "tok").Return(&auth.Session{UserID: "u1"}, nil)
+		sessions.On("ByToken", mock.Anything, "tok").Return(&auth.Session{UserID: id.ID(1)}, nil)
 
 		validate := auth.NewTokenValidator(sessions)
 		userID, err := validate(context.Background(), "tok")
 		require.NoError(t, err)
-		require.Equal(t, "u1", userID)
+		require.Equal(t, id.ID(1), userID)
 	})
 
-	t.Run("unknown session returns empty user id", func(t *testing.T) {
+	t.Run("unknown session returns zero user id", func(t *testing.T) {
 		sessions := mocks.NewSessionRepository(t)
 
 		sessions.On("ByToken", mock.Anything, "tok").Return((*auth.Session)(nil), nil)

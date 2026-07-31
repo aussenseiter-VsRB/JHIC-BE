@@ -15,7 +15,7 @@ The `auth` domain handles user identity and session management. It provides regi
 
 ```go
 type User struct {
-    ID           string    `json:"id"`
+    ID           id.ID     `json:"id"`
     Email        string    `json:"email"`
     PasswordHash string    `json:"-"` // never serialized
     Name         string    `json:"name"`

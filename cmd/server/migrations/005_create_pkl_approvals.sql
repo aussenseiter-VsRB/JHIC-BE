@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS pkl_requests (
-    id TEXT PRIMARY KEY,
-    requester_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id BIGINT PRIMARY KEY,
+    requester_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     company TEXT NOT NULL,
     location TEXT NOT NULL,
     start_date DATE NOT NULL,
@@ -19,10 +19,10 @@ CREATE INDEX idx_pkl_requests_requester ON pkl_requests (requester_id);
 CREATE INDEX idx_pkl_requests_status ON pkl_requests (status);
 
 CREATE TABLE IF NOT EXISTS pkl_approval_steps (
-    id TEXT PRIMARY KEY,
-    pkl_request_id TEXT NOT NULL REFERENCES pkl_requests(id) ON DELETE CASCADE,
+    id BIGINT PRIMARY KEY,
+    pkl_request_id BIGINT NOT NULL REFERENCES pkl_requests(id) ON DELETE CASCADE,
     position TEXT NOT NULL,
-    approver_id TEXT NOT NULL REFERENCES users(id),
+    approver_id BIGINT NOT NULL REFERENCES users(id),
     status TEXT NOT NULL DEFAULT 'pending',
     note TEXT NOT NULL DEFAULT '',
     sequence INT NOT NULL,

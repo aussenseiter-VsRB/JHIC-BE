@@ -43,11 +43,11 @@ type: Enforce
 
 **Rationale:** `golang-migrate/migrate` requires driver registration and database/sql compatibility layers. A custom runner with `embed` or filesystem reads is ~60 lines, has zero extra dependencies, and is fully transparent. Down migrations are handled manually via SQL scripts when needed.
 
-## UUID generation (2026-07-20)
+## Snowflake IDs (2026-07-31)
 
-**Decision:** Generate UUIDs client-side in Go using `crypto/rand` (`internal/pkg/id/id.go`), not database-side `gen_random_uuid()`.
+**Decision:** Generate snowflake IDs client-side in Go (`internal/pkg/id/id.go`), stored as `BIGINT` in Postgres and serialized as decimal strings in JSON. The `id.ID` named type (int64) is used across entities, repositories, services, handlers, and middleware instead of `string`.
 
-**Rationale:** Client-side UUIDs let services create entities and return them immediately without a round-trip to get the generated ID. The stdlib approach avoids adding the `google/uuid` dependency.
+**Rationale:** UUIDs are opaque, unorderable blobs (36 chars, no sort semantics, no embedded time), while snowflakes are 64-bit ints that are sortable, index-friendly (BIGINT beats TEXT), and embed a millisecond timestamp (41 bits since `2024-01-01` UTC) plus a node ID (10 bits, from `SNOWFLAKE_NODE_ID`, default 0) and a per-millisecond sequence (12 bits). The `sync.Mutex`-guarded generator guarantees monotonicity under concurrency, including clock-skew sleeps. Client-side generation (the same property that motivated the original UUID decision) lets services create entities and return them immediately without a round-trip to the database. IDs are marshaled to decimal strings so JavaScript clients never lose precision on values above 2^53. `created_at` is still kept on every table: it remains queryable and DB-defaulted at insert time, independent of the client-generated ID timestamp.
 
 ## S3-compatible storage (2026-07-20)
 

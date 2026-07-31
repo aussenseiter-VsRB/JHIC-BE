@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -38,7 +39,7 @@ func (r *Repository) List(ctx context.Context) ([]berita.Berita, error) {
 	return list, rows.Err()
 }
 
-func (r *Repository) ByID(ctx context.Context, id string) (*berita.Berita, error) {
+func (r *Repository) ByID(ctx context.Context, id id.ID) (*berita.Berita, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT id, author_id, title, content, COALESCE(image_url, ''), created_at, updated_at
 		 FROM berita WHERE id = $1`, id,
@@ -78,7 +79,7 @@ func (r *Repository) Update(ctx context.Context, b *berita.Berita) error {
 	return nil
 }
 
-func (r *Repository) Delete(ctx context.Context, id string) error {
+func (r *Repository) Delete(ctx context.Context, id id.ID) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM berita WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete berita: %w", err)
