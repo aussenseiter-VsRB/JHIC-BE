@@ -31,8 +31,8 @@ func NewHandler(svc *Service, store stor.Client) *Handler {
 
 func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler) {
 	mux.Handle("POST /api/v1/berita", authMw(roleMw(http.HandlerFunc(h.Create))))
-	mux.Handle("GET /api/v1/berita", authMw(roleMw(http.HandlerFunc(h.List))))
-	mux.Handle("GET /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Get))))
+	mux.Handle("GET /api/v1/berita", http.HandlerFunc(h.List))
+	mux.Handle("GET /api/v1/berita/{id}", http.HandlerFunc(h.Get))
 	mux.Handle("PUT /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Update))))
 	mux.Handle("DELETE /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Delete))))
 	mux.Handle("POST /api/v1/berita/{id}/image", authMw(roleMw(http.HandlerFunc(h.UploadImage))))

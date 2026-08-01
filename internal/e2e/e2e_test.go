@@ -193,7 +193,11 @@ func TestE2E_LoginLogout(t *testing.T) {
 	require.Equal(t, 0, sessions)
 
 	resp = doJSON(t, http.MethodGet, e.server.URL+"/api/v1/berita", login.Token, nil)
-	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	resp = doJSON(t, http.MethodGet, e.server.URL+"/api/v1/berita", "", nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 }
 
@@ -433,10 +437,10 @@ func TestE2E_RoleAndAuthorization(t *testing.T) {
 	missingResp.Body.Close()
 
 	noAuthResp := doJSON(t, http.MethodGet, baseURL, "", nil)
-	require.Equal(t, http.StatusUnauthorized, noAuthResp.StatusCode)
+	require.Equal(t, http.StatusOK, noAuthResp.StatusCode)
 	noAuthResp.Body.Close()
 
 	badTokenResp := doJSON(t, http.MethodGet, baseURL, "invalid-token", nil)
-	require.Equal(t, http.StatusUnauthorized, badTokenResp.StatusCode)
+	require.Equal(t, http.StatusOK, badTokenResp.StatusCode)
 	badTokenResp.Body.Close()
 }

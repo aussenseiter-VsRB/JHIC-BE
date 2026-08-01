@@ -34,18 +34,18 @@ type Berita struct {
 
 ## Endpoints
 
-All berita endpoints require authentication (`Bearer` token) and the `jurnal` role.
+Reads are **public** — listing and reading articles requires no authentication. All write endpoints require authentication (`Bearer` token) and the `jurnal` role.
 
-| Method | Path | Handler | Description |
-|---|---|---|---|
-| GET | /api/v1/berita | List | List all news articles |
-| GET | /api/v1/berita/{id} | Get | Get article by ID |
-| POST | /api/v1/berita | Create | Create a new article |
-| PUT | /api/v1/berita/{id} | Update | Update article (author only) |
-| DELETE | /api/v1/berita/{id} | Delete | Delete article + its images (author only) |
-| POST | /api/v1/berita/{id}/image | UploadImage | Upload/replace article cover image |
-| POST | /api/v1/berita/{id}/images | UploadContentImage | Upload an inline content image (author only) |
-| DELETE | /api/v1/berita/{id}/images?key={key} | DeleteContentImage | Delete an inline content image (author only) |
+| Method | Path | Handler | Description | Access |
+|---|---|---|---|---|
+| GET | /api/v1/berita | List | List all news articles | public |
+| GET | /api/v1/berita/{id} | Get | Get article by ID | public |
+| POST | /api/v1/berita | Create | Create a new article | jurnal |
+| PUT | /api/v1/berita/{id} | Update | Update article (author only) | jurnal |
+| DELETE | /api/v1/berita/{id} | Delete | Delete article + its images (author only) | jurnal |
+| POST | /api/v1/berita/{id}/image | UploadImage | Upload/replace article cover image | jurnal |
+| POST | /api/v1/berita/{id}/images | UploadContentImage | Upload an inline content image (author only) | jurnal |
+| DELETE | /api/v1/berita/{id}/images?key={key} | DeleteContentImage | Delete an inline content image (author only) | jurnal |
 
 ### Inline image flow
 
@@ -89,7 +89,8 @@ DELETE /api/v1/berita/{id}
 
 ## Rules
 
-- All endpoints require `jurnal` role (auth + role middleware applied in `Register`).
+- The `Get`/`List` read routes are public (no auth middleware). `List` and `Get` do not read the request context for user identity, so anonymous access is safe.
+- All write endpoints require the `jurnal` role (auth + role middleware applied in `Register`).
 - Only the article author can update, delete, or upload/delete images on their own articles (`forbidden: not the author`).
 - Content is plain markdown, required, and limited to 100 KB.
 - Image uploads are limited to 5 MB, accepted types: `image/jpeg`, `image/png`, `image/gif`, `image/webp`.
@@ -101,6 +102,12 @@ DELETE /api/v1/berita/{id}
 ## cURL examples
 
 ```bash
+# List articles (public — no auth required)
+curl http://localhost:8080/api/v1/berita
+
+# Get one article (public — no auth required)
+curl http://localhost:8080/api/v1/berita/{id}
+
 # Create article
 curl -X POST http://localhost:8080/api/v1/berita \
   -H 'Content-Type: application/json' \
