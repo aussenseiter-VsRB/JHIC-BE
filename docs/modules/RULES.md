@@ -29,6 +29,22 @@ internal/domain/{domainName}/
 - `types.go` — Request/response types if they grow beyond the handler file.
 - `errors.go` — Sentinel errors for the domain.
 
+### Non-DB domains (e.g. `ai`)
+
+Domains with no persistence swap the `pg/` + `repository.go` contract for an external-client contract:
+
+```
+internal/domain/{domainName}/
+├── entity.go          — Domain structs
+├── errors.go          — Sentinel errors (validation + upstream failures)
+├── service.go         — Business logic (validation, calls client interface)
+├── handler.go         — HTTP handlers + route registration
+├── client.go          — Client interface the service depends on
+├── mocks/             — Mockery-generated test mocks
+```
+
+The real implementation lives in `internal/infrastructure/{service}/` (e.g. `internal/infrastructure/n8n/`) and imports the domain package for its types. Services wrap upstream failures in the domain's sentinel errors so handlers can map them to status codes (e.g. 502/504) without leaking internal detail.
+
 ## 2. File contracts
 
 ### entity.go

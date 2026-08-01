@@ -4,13 +4,17 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/ai"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
@@ -21,6 +25,7 @@ import (
 	userpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/n8n"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/storage"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -146,6 +151,26 @@ func TestMain(m *testing.M) {
 	pklSvc := pkl.NewService(pklRepo, userRepo)
 	pklHnd := pkl.NewHandler(pklSvc)
 
+	n8nStub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/chat":
+			json.NewEncoder(w).Encode(map[string]string{"output": "hai dari nexxa"})
+		case "/nexxa":
+			json.NewEncoder(w).Encode(map[string]string{"nama_jurusan": "PPLG", "alasan": "cocok"})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	n8nClient := n8n.NewClient(n8n.Config{
+		BaseURL:   n8nStub.URL,
+		ChatPath:  "/chat",
+		NexxaPath: "/nexxa",
+		Timeout:   5 * time.Second,
+	})
+	aiSvc := ai.NewService(n8nClient)
+	aiHnd := ai.NewHandler(aiSvc, middleware.RateLimit(1000))
+
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
 	roleChecker := func(ctx context.Context, userID id.ID) (string, error) {
@@ -160,13 +185,14 @@ func TestMain(m *testing.M) {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, authMw, roleMw, roleChecker)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, aiHnd, authMw, roleMw, roleChecker)
 	server := httptest.NewServer(router)
 
 	testEnv = &env{server: server, pool: pool, store: store, verifyS3: verifyS3}
 
 	code := m.Run()
 	server.Close()
+	n8nStub.Close()
 	pool.Close()
 	_ = pgContainer.Terminate(ctx)
 	_ = minioContainer.Terminate(ctx)

@@ -23,7 +23,8 @@ docs/
     ├── featureTesting.md   — Procedure for testing a new feature (Enforce)
     ├── auth/               — Auth domain documentation
     ├── user/               — User domain documentation
-    └── berita/             — Berita (news) domain documentation
+    ├── berita/             — Berita (news) domain documentation
+    └── ai/                 — AI (n8n webhook proxy) domain documentation
 ```
 
 ## Section-specific rules

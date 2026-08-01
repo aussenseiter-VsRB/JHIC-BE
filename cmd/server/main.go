@@ -13,6 +13,7 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/config"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/ai"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
@@ -23,6 +24,7 @@ import (
 	userpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/n8n"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/storage"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 	"github.com/joho/godotenv"
@@ -76,6 +78,18 @@ func main() {
 	pklSvc := pkl.NewService(pklRepo, userRepo)
 	pklHnd := pkl.NewHandler(pklSvc)
 
+	n8nClient := n8n.NewClient(n8n.Config{
+		BaseURL:      cfg.N8NBaseURL,
+		ChatPath:     cfg.N8NChatPath,
+		ChatUsername: cfg.N8NChatUsername,
+		ChatPassword: cfg.N8NChatPassword,
+		NexxaPath:    cfg.N8NNexxaPath,
+		NexxaSecret:  cfg.N8NNexxaSecret,
+		Timeout:      cfg.N8NTimeout,
+	})
+	aiSvc := ai.NewService(n8nClient)
+	aiHnd := ai.NewHandler(aiSvc, middleware.RateLimit(cfg.AIRateLimit))
+
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
 	roleCheck := userSvc.ByID
@@ -91,13 +105,13 @@ func main() {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, authMw, roleMw, roleChecker)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, aiHnd, authMw, roleMw, roleChecker)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
 		Handler:      router,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 

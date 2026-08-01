@@ -1,0 +1,8 @@
+package ai
+
+import "context"
+
+type N8NClient interface {
+	Chat(ctx context.Context, chatInput, sessionID string) (*ChatResponse, error)
+	NexxaMatch(ctx context.Context, answers []string) (*NexxaResponse, error)
+}
