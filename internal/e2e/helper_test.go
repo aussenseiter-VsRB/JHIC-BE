@@ -157,7 +157,7 @@ func TestMain(m *testing.M) {
 		case "/chat":
 			json.NewEncoder(w).Encode(map[string]string{"output": "hai dari nexxa"})
 		case "/nexxa":
-			json.NewEncoder(w).Encode(map[string]string{"nama_jurusan": "PPLG", "alasan": "cocok"})
+			w.Write([]byte(`{"nama_jurusan":"PPLG","alasan":"cocok","persentase_pplg":60,"persentase_akuntansi":30,"persentase_hotel":10}`))
 		default:
 			http.NotFound(w, r)
 		}

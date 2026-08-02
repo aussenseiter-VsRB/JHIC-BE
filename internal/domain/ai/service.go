@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -44,7 +46,32 @@ func (s *Service) NexxaMatch(ctx context.Context, answers []string) (*NexxaRespo
 		}
 		normalized[i] = a
 	}
-	return s.client.NexxaMatch(ctx, normalized)
+
+	raw, err := s.client.NexxaMatch(ctx, normalized)
+	if err != nil {
+		return nil, err
+	}
+
+	data, errs := normalizeNexxaOutput(raw)
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("%w: %s", ErrNexxaOutputInvalid, errs[0].Message)
+	}
+
+	return &NexxaResponse{
+		NamaJurusan:         data.NamaJurusan,
+		Alasan:              data.Alasan,
+		PersentasePPLG:      data.PersentasePPLG,
+		PersentaseAkuntansi: data.PersentaseAkuntansi,
+		PersentaseHotel:     data.PersentaseHotel,
+	}, nil
+}
+
+func (s *Service) ValidateNexxaInput(raw map[string]json.RawMessage) (map[string]string, []APIError) {
+	return validateNexxaInput(raw)
+}
+
+func (s *Service) NormalizeNexxaOutput(raw string) (*NormalizeOutputData, []APIError) {
+	return normalizeNexxaOutput(raw)
 }
 
 func newSessionID() string {

@@ -34,6 +34,28 @@ func (n NexxaRequest) Answers() []string {
 }
 
 type NexxaResponse struct {
-	NamaJurusan string `json:"nama_jurusan"`
-	Alasan      string `json:"alasan"`
+	NamaJurusan         string `json:"nama_jurusan"`
+	Alasan              string `json:"alasan"`
+	PersentasePPLG      int    `json:"persentase_pplg"`
+	PersentaseAkuntansi int    `json:"persentase_akuntansi"`
+	PersentaseHotel     int    `json:"persentase_hotel"`
+}
+
+type APIError struct {
+	Field   string `json:"field,omitempty"`
+	Message string `json:"message"`
+}
+
+type ValidateInputData map[string]string
+
+type NormalizeOutputRequest struct {
+	Raw string `json:"raw"`
+}
+
+type NormalizeOutputData struct {
+	NamaJurusan         string `json:"nama_jurusan"`
+	Alasan              string `json:"alasan"`
+	PersentasePPLG      int    `json:"persentase_pplg"`
+	PersentaseAkuntansi int    `json:"persentase_akuntansi"`
+	PersentaseHotel     int    `json:"persentase_hotel"`
 }

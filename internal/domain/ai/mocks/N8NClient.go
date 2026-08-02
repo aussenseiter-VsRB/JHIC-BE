@@ -46,24 +46,22 @@ func (_m *N8NClient) Chat(ctx context.Context, chatInput string, sessionID strin
 }
 
 // NexxaMatch provides a mock function with given fields: ctx, answers
-func (_m *N8NClient) NexxaMatch(ctx context.Context, answers []string) (*ai.NexxaResponse, error) {
+func (_m *N8NClient) NexxaMatch(ctx context.Context, answers []string) (string, error) {
 	ret := _m.Called(ctx, answers)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NexxaMatch")
 	}
 
-	var r0 *ai.NexxaResponse
+	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string) (*ai.NexxaResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []string) (string, error)); ok {
 		return rf(ctx, answers)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []string) *ai.NexxaResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []string) string); ok {
 		r0 = rf(ctx, answers)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ai.NexxaResponse)
-		}
+		r0 = ret.Get(0).(string)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {

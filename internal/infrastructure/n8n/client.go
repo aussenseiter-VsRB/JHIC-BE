@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -58,47 +59,73 @@ func (c *Client) Chat(ctx context.Context, chatInput, sessionID string) (*ai.Cha
 	return &out, nil
 }
 
-func (c *Client) NexxaMatch(ctx context.Context, answers []string) (*ai.NexxaResponse, error) {
+func (c *Client) NexxaMatch(ctx context.Context, answers []string) (string, error) {
 	payload := map[string]string{}
 	for i := 0; i < len(answers) && i < ai.NexxaAnswerCount; i++ {
 		payload[fmt.Sprintf("jawaban_%d", i+1)] = answers[i]
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ai.ErrN8NUnavailable, err)
+		return "", fmt.Errorf("%w: %v", ai.ErrN8NUnavailable, err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+c.cfg.NexxaPath, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ai.ErrN8NUnavailable, err)
+		return "", fmt.Errorf("%w: %v", ai.ErrN8NUnavailable, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.cfg.NexxaSecret != "" {
 		req.Header.Set(nexxaHeaderName, c.cfg.NexxaSecret)
 	}
 
-	var out ai.NexxaResponse
-	if err := c.do(req, &out); err != nil {
-		return nil, err
+	raw, err := c.doRaw(req)
+	if err != nil {
+		return "", err
 	}
-	return &out, nil
+	return raw, nil
 }
 
 func (c *Client) do(req *http.Request, out any) error {
+	raw, err := c.doRaw(req)
+	if err != nil {
+		return err
+	}
+
+	body := []byte(raw)
+	if err := json.Unmarshal(body, out); err == nil {
+		return nil
+	}
+
+	var items []json.RawMessage
+	if err := json.Unmarshal(body, &items); err != nil {
+		return fmt.Errorf("%w: invalid response: %v", ai.ErrN8NUnavailable, err)
+	}
+	if len(items) == 0 {
+		return fmt.Errorf("%w: invalid response: empty items", ai.ErrN8NUnavailable)
+	}
+	if err := json.Unmarshal(items[0], out); err != nil {
+		return fmt.Errorf("%w: invalid response: %v", ai.ErrN8NUnavailable, err)
+	}
+	return nil
+}
+
+func (c *Client) doRaw(req *http.Request) (string, error) {
 	resp, err := c.hc.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return ai.ErrN8NTimeout
+			return "", ai.ErrN8NTimeout
 		}
-		return fmt.Errorf("%w: %v", ai.ErrN8NUnavailable, err)
+		return "", fmt.Errorf("%w: %v", ai.ErrN8NUnavailable, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w: status %d", ai.ErrN8NUnavailable, resp.StatusCode)
+		return "", fmt.Errorf("%w: status %d", ai.ErrN8NUnavailable, resp.StatusCode)
 	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("%w: invalid response: %v", ai.ErrN8NUnavailable, err)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("%w: read response: %v", ai.ErrN8NUnavailable, err)
 	}
-	return nil
+	return string(body), nil
 }

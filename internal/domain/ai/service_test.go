@@ -84,13 +84,25 @@ func TestService_NexxaMatch(t *testing.T) {
 				}
 			}
 			return true
-		})).Return(&ai.NexxaResponse{NamaJurusan: "PPLG", Alasan: "cocok"}, nil)
+		})).Return(`{"nama_jurusan":"PPLG","alasan":"cocok","persentase_pplg":60,"persentase_akuntansi":30,"persentase_hotel":10}`, nil)
 
 		svc := ai.NewService(client)
 		got, err := svc.NexxaMatch(context.Background(), []string{" a ", "b", "c", "d", "e", "f", "g", "h"})
 		require.NoError(t, err)
 		require.Equal(t, "PPLG", got.NamaJurusan)
 		require.Equal(t, "cocok", got.Alasan)
+		require.Equal(t, 60, got.PersentasePPLG)
+		require.Equal(t, 30, got.PersentaseAkuntansi)
+		require.Equal(t, 10, got.PersentaseHotel)
+	})
+
+	t.Run("invalid model output rejected", func(t *testing.T) {
+		client := mocks.NewN8NClient(t)
+		client.On("NexxaMatch", mock.Anything, mock.Anything).Return("not json at all", nil)
+
+		svc := ai.NewService(client)
+		_, err := svc.NexxaMatch(context.Background(), valid)
+		require.ErrorIs(t, err, ai.ErrNexxaOutputInvalid)
 	})
 
 	t.Run("wrong answer count rejected", func(t *testing.T) {

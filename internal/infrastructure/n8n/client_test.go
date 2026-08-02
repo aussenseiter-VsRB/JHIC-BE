@@ -71,6 +71,17 @@ func TestClient_Chat(t *testing.T) {
 		require.Empty(t, gotAuth)
 	})
 
+	t.Run("unwraps array-of-items response", func(t *testing.T) {
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`[{"output":"hai"}]`))
+		})
+		client := n8n.NewClient(n8n.Config{BaseURL: srv.URL, ChatPath: "/chat", Timeout: time.Second})
+		out, err := client.Chat(context.Background(), "halo", "session-1")
+		require.NoError(t, err)
+		require.Equal(t, "hai", out.Output)
+	})
+
 	t.Run("non-2xx maps to unavailable", func(t *testing.T) {
 		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "unauthorized", http.StatusForbidden)
@@ -99,7 +110,7 @@ func TestClient_NexxaMatch(t *testing.T) {
 			gotPath = r.URL.Path
 			gotSecret = r.Header.Get("X-JHIC-Secret")
 			gotBody = readBody(t, r)
-			json.NewEncoder(w).Encode(map[string]string{"nama_jurusan": "PPLG", "alasan": "cocok"})
+			w.Write([]byte(`{"nama_jurusan":"PPLG","alasan":"cocok","persentase_pplg":60,"persentase_akuntansi":30,"persentase_hotel":10}`))
 		})
 
 		client := n8n.NewClient(n8n.Config{
@@ -111,13 +122,22 @@ func TestClient_NexxaMatch(t *testing.T) {
 		answers := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
 		out, err := client.NexxaMatch(context.Background(), answers)
 		require.NoError(t, err)
-		require.Equal(t, "PPLG", out.NamaJurusan)
-		require.Equal(t, "cocok", out.Alasan)
+		require.JSONEq(t, `{"nama_jurusan":"PPLG","alasan":"cocok","persentase_pplg":60,"persentase_akuntansi":30,"persentase_hotel":10}`, out)
 		require.Equal(t, "/nexxa", gotPath)
 		require.Equal(t, "sekret", gotSecret)
 		for i := 0; i < 8; i++ {
 			require.Equal(t, answers[i], gotBody[fmt.Sprintf("jawaban_%d", i+1)])
 		}
+	})
+
+	t.Run("relays raw output text", func(t *testing.T) {
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`{"nama_jurusan":"PPLG","alasan":"cocok"}`))
+		})
+		client := n8n.NewClient(n8n.Config{BaseURL: srv.URL, NexxaPath: "/nexxa", Timeout: time.Second})
+		out, err := client.NexxaMatch(context.Background(), []string{"a", "b", "c", "d", "e", "f", "g", "h"})
+		require.NoError(t, err)
+		require.Equal(t, `{"nama_jurusan":"PPLG","alasan":"cocok"}`, out)
 	})
 
 	t.Run("non-2xx maps to unavailable", func(t *testing.T) {
