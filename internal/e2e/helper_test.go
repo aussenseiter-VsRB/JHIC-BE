@@ -15,6 +15,7 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/chat"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/cvreview"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/match"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
@@ -159,6 +160,8 @@ func TestMain(m *testing.M) {
 			json.NewEncoder(w).Encode(map[string]string{"output": "hai dari nexxa"})
 		case "/nexxa":
 			w.Write([]byte(`{"nama_jurusan":"PPLG","alasan":"cocok","persentase_pplg":60,"persentase_akuntansi":30,"persentase_hotel":10}`))
+		case "/cv-review":
+			w.Write([]byte(cvReviewStubOutput))
 		default:
 			http.NotFound(w, r)
 		}
@@ -167,6 +170,7 @@ func TestMain(m *testing.M) {
 		BaseURL:   n8nStub.URL,
 		ChatPath:  "/chat",
 		NexxaPath: "/nexxa",
+		CvPath:    "/cv-review",
 		Timeout:   5 * time.Second,
 	})
 	chatSvc := chat.NewService(n8nClient)
@@ -176,6 +180,8 @@ func TestMain(m *testing.M) {
 
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
+	cvSvc := cvreview.NewService(n8nClient)
+	cvHnd := cvreview.NewHandler(cvSvc, authMw, middleware.RateLimit(1000))
 	roleChecker := func(ctx context.Context, userID id.ID) (string, error) {
 		u, err := userSvc.ByID(ctx, userID)
 		if err != nil {
@@ -188,7 +194,7 @@ func TestMain(m *testing.M) {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, authMw, roleMw, roleChecker)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, authMw, roleMw, roleChecker)
 	server := httptest.NewServer(router)
 
 	testEnv = &env{server: server, pool: pool, store: store, verifyS3: verifyS3}

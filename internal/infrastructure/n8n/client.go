@@ -24,6 +24,8 @@ type Config struct {
 	ChatPassword string
 	NexxaPath    string
 	NexxaSecret  string
+	CvPath       string
+	CvSecret     string
 	Timeout      time.Duration
 }
 
@@ -78,6 +80,35 @@ func (c *Client) NexxaMatch(ctx context.Context, answers []string) (string, erro
 	req.Header.Set("Content-Type", "application/json")
 	if c.cfg.NexxaSecret != "" {
 		req.Header.Set(nexxaHeaderName, c.cfg.NexxaSecret)
+	}
+
+	raw, err := c.doRaw(req)
+	if err != nil {
+		return "", err
+	}
+	return raw, nil
+}
+
+func (c *Client) CvReview(ctx context.Context, cvText string, wordCount, pageCount int) (string, error) {
+	payload := map[string]any{
+		"body": map[string]any{
+			"cv_text":    cvText,
+			"word_count": wordCount,
+			"page_count": pageCount,
+		},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", nexxa.ErrN8NUnavailable, err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+c.cfg.CvPath, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", nexxa.ErrN8NUnavailable, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.cfg.CvSecret != "" {
+		req.Header.Set(nexxaHeaderName, c.cfg.CvSecret)
 	}
 
 	raw, err := c.doRaw(req)

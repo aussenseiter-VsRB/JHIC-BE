@@ -14,6 +14,7 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/config"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/chat"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/cvreview"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/match"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
@@ -86,6 +87,8 @@ func main() {
 		ChatPassword: cfg.N8NChatPassword,
 		NexxaPath:    cfg.N8NNexxaPath,
 		NexxaSecret:  cfg.N8NNexxaSecret,
+		CvPath:       cfg.N8NCvPath,
+		CvSecret:     cfg.N8NCvSecret,
 		Timeout:      cfg.N8NTimeout,
 	})
 	chatSvc := chat.NewService(n8nClient)
@@ -95,6 +98,8 @@ func main() {
 
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
+	cvSvc := cvreview.NewService(n8nClient)
+	cvHnd := cvreview.NewHandler(cvSvc, authMw, middleware.RateLimit(cfg.AIRateLimit))
 	roleCheck := userSvc.ByID
 	roleChecker := func(ctx context.Context, userID id.ID) (string, error) {
 		u, err := roleCheck(ctx, userID)
@@ -108,7 +113,7 @@ func main() {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, authMw, roleMw, roleChecker)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, authMw, roleMw, roleChecker)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),

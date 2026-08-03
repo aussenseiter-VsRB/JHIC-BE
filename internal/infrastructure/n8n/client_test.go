@@ -102,8 +102,59 @@ func TestClient_Chat(t *testing.T) {
 	})
 }
 
-func TestClient_NexxaMatch(t *testing.T) {
-	t.Run("forwards eight answers with secret header", func(t *testing.T) {
+func TestClient_CvReview(t *testing.T) {
+	t.Run("forwards wrapped body with secret header and relays raw", func(t *testing.T) {
+		var gotPath, gotSecret string
+		var gotBody map[string]any
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			gotSecret = r.Header.Get("X-JHIC-Secret")
+			b, _ := io.ReadAll(r.Body)
+			require.NoError(t, json.Unmarshal(b, &gotBody))
+			w.Write([]byte(`{"audit_summary":{"score":80}}`))
+		})
+
+		client := n8n.NewClient(n8n.Config{
+			BaseURL:   srv.URL,
+			CvPath:    "/cv",
+			CvSecret:  "cv-secret",
+			Timeout:   time.Second,
+		})
+		out, err := client.CvReview(context.Background(), "CV saya", 300, 1)
+		require.NoError(t, err)
+		require.Equal(t, "/cv", gotPath)
+		require.Equal(t, "cv-secret", gotSecret)
+		body, ok := gotBody["body"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, "CV saya", body["cv_text"])
+		require.Equal(t, float64(300), body["word_count"])
+		require.Equal(t, float64(1), body["page_count"])
+		require.Equal(t, `{"audit_summary":{"score":80}}`, out)
+	})
+
+	t.Run("omits secret header when unset", func(t *testing.T) {
+		var gotSecret string
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotSecret = r.Header.Get("X-JHIC-Secret")
+			w.Write([]byte(`{}`))
+		})
+		client := n8n.NewClient(n8n.Config{BaseURL: srv.URL, CvPath: "/cv", Timeout: time.Second})
+		_, err := client.CvReview(context.Background(), "CV saya", 1, 1)
+		require.NoError(t, err)
+		require.Empty(t, gotSecret)
+	})
+
+	t.Run("non-2xx maps to unavailable", func(t *testing.T) {
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "boom", http.StatusInternalServerError)
+		})
+		client := n8n.NewClient(n8n.Config{BaseURL: srv.URL, CvPath: "/cv", Timeout: time.Second})
+		_, err := client.CvReview(context.Background(), "CV saya", 1, 1)
+		require.ErrorIs(t, err, nexxa.ErrN8NUnavailable)
+	})
+}
+
+func TestClient_NexxaMatch(t *testing.T) {	t.Run("forwards eight answers with secret header", func(t *testing.T) {
 		var gotPath, gotSecret string
 		var gotBody map[string]string
 		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {

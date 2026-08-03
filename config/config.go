@@ -21,6 +21,8 @@ type Config struct {
 	N8NChatPassword string
 	N8NNexxaPath    string
 	N8NNexxaSecret  string
+	N8NCvPath       string
+	N8NCvSecret     string
 	N8NTimeout      time.Duration
 	AIRateLimit     int
 }
@@ -53,6 +55,8 @@ func Load() *Config {
 		N8NChatPassword: getEnv("N8N_CHAT_PASSWORD", ""),
 		N8NNexxaPath:    getEnv("N8N_NEXXA_PATH", "/webhook/e44f0376-40ef-42f4-980b-ec38e8390592"),
 		N8NNexxaSecret:  getEnv("N8N_NEXXA_SECRET", ""),
+		N8NCvPath:       getEnv("N8N_CV_PATH", ""),
+		N8NCvSecret:     getEnv("N8N_CV_SECRET", ""),
 		N8NTimeout:      time.Duration(timeout) * time.Second,
 		AIRateLimit:     rateLimit,
 	}
