@@ -3,17 +3,19 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	Port        int
-	DatabaseURL string
-	B2Endpoint  string
-	B2KeyID     string
-	B2AppKey    string
-	B2Bucket    string
-	B2Region    string
+	Port              int
+	CORSAllowedOrigin []string
+	DatabaseURL       string
+	B2Endpoint        string
+	B2KeyID           string
+	B2AppKey          string
+	B2Bucket          string
+	B2Region          string
 
 	N8NBaseURL      string
 	N8NChatPath     string
@@ -40,14 +42,19 @@ func Load() *Config {
 	if rateLimit == 0 {
 		rateLimit = 10
 	}
+	origins := strings.FieldsFunc(getEnv("CORS_ALLOWED_ORIGINS", "*"), func(r rune) bool { return r == ',' })
+	for i, o := range origins {
+		origins[i] = strings.TrimSpace(o)
+	}
 	return &Config{
-		Port:        port,
-		DatabaseURL: getEnv("DATABASE_URL", "postgres://localhost:5432/jhic?sslmode=disable"),
-		B2Endpoint:  getEnv("B2_ENDPOINT", "s3.eu-central-003.backblazeb2.com"),
-		B2KeyID:     getEnv("B2_KEY_ID", ""),
-		B2AppKey:    getEnv("B2_APP_KEY", ""),
-		B2Bucket:    getEnv("B2_BUCKET", "jhic-berita-images"),
-		B2Region:    getEnv("B2_REGION", ""),
+		Port:              port,
+		CORSAllowedOrigin: origins,
+		DatabaseURL:       getEnv("DATABASE_URL", "postgres://localhost:5432/jhic?sslmode=disable"),
+		B2Endpoint:        getEnv("B2_ENDPOINT", "s3.eu-central-003.backblazeb2.com"),
+		B2KeyID:           getEnv("B2_KEY_ID", ""),
+		B2AppKey:          getEnv("B2_APP_KEY", ""),
+		B2Bucket:          getEnv("B2_BUCKET", "jhic-berita-images"),
+		B2Region:          getEnv("B2_REGION", ""),
 
 		N8NBaseURL:      getEnv("N8N_BASE_URL", "https://n8n-b0wow8osw0okkcwc0g0gog4o.dev.usbypkp.ac.id"),
 		N8NChatPath:     getEnv("N8N_CHAT_PATH", "/webhook/d1b0712b-8783-46ee-8add-5a386132f460/chat"),

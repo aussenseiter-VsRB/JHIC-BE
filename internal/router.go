@@ -3,17 +3,17 @@ package internal
 import (
 	"net/http"
 
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/chat"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/cvreview"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/match"
-	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
-	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 )
 
-func NewRouter(ah *auth.Handler, uh *user.Handler, bh *berita.Handler, pklHnd *pkl.Handler, chatHnd *chat.Handler, matchHnd *match.Handler, cvHnd *cvreview.Handler, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler, roleCheck middleware.RoleChecker) http.Handler {
+func NewRouter(ah *auth.Handler, uh *user.Handler, bh *berita.Handler, pklHnd *pkl.Handler, chatHnd *chat.Handler, matchHnd *match.Handler, cvHnd *cvreview.Handler, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler, roleCheck middleware.RoleChecker, corsOrigins []string) http.Handler {
 	mux := http.NewServeMux()
 
 	ah.Register(mux)
@@ -31,6 +31,6 @@ func NewRouter(ah *auth.Handler, uh *user.Handler, bh *berita.Handler, pklHnd *p
 
 	var h http.Handler = mux
 	h = middleware.Logger(h)
-	h = middleware.CORS(h)
+	h = middleware.CORS(corsOrigins)(h)
 	return h
 }

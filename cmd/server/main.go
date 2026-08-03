@@ -13,13 +13,13 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/config"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
-	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/chat"
-	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/cvreview"
-	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/match"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 	beritapg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita/pg"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/chat"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/cvreview"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/match"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
 	pklpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
@@ -113,7 +113,7 @@ func main() {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, authMw, roleMw, roleChecker)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, authMw, roleMw, roleChecker, cfg.CORSAllowedOrigin)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),

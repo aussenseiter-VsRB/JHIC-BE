@@ -68,7 +68,7 @@ config/
 4. Instantiate repositories → services → handlers (manual DI)
 5. Register routes on `http.ServeMux`
 6. Instantiate middleware (auth token validator, role checker)
-7. Apply middleware chain (logger → CORS — globally; auth + role applied per-route on protected endpoints)
+7. Apply middleware chain (logger → CORS — globally; auth + role applied per-route on protected endpoints). CORS reflects the request `Origin` when it matches `CORS_ALLOWED_ORIGINS` (comma-separated env list, `*` default), sends `Access-Control-Allow-Credentials: true` for reflected origins, and short-circuits preflight `OPTIONS` with `204` (or `403` for disallowed origins).
 8. Start server with graceful shutdown on SIGINT/SIGTERM
 
 ## Key principles
