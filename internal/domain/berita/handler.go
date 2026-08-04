@@ -112,6 +112,7 @@ func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
 	}
 	obj, err := h.store.Get(r.Context(), key)
 	if err != nil {
+		log.Printf("berita: serve image %q: %v", key, err)
 		response.Error(w, http.StatusNotFound, "image not found")
 		return
 	}
