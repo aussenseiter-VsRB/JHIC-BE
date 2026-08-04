@@ -1,10 +1,46 @@
 package berita
 
 import (
+	"crypto/tls"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/pkg/id"
 )
+
+func TestImageRequestScheme(t *testing.T) {
+	tests := []struct {
+		name    string
+		host    string
+		proto   string
+		tls     bool
+		want    string
+	}{
+		{name: "public host defaults to https", host: "jhicbe-3svk08cr.b4a.run", want: "https"},
+		{name: "https forwarded proto wins", host: "jhicbe-3svk08cr.b4a.run", proto: "https", want: "https"},
+		{name: "stale http forwarded proto ignored for public host", host: "jhicbe-3svk08cr.b4a.run", proto: "http", want: "https"},
+		{name: "direct TLS", host: "example.com", tls: true, want: "https"},
+		{name: "localhost stays http", host: "localhost:8080", want: "http"},
+		{name: "127.0.0.1 stays http", host: "127.0.0.1:8080", want: "http"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "http://"+tt.host+"/", nil)
+			req.Host = tt.host
+			if tt.proto != "" {
+				req.Header.Set("X-Forwarded-Proto", tt.proto)
+			}
+			if tt.tls {
+				req.TLS = &tls.ConnectionState{}
+			}
+			if got := imageRequestScheme(req); got != tt.want {
+				t.Errorf("imageRequestScheme() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestIsValidContentKey(t *testing.T) {
 	tests := []struct {

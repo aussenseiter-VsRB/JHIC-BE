@@ -355,13 +355,32 @@ func (h *Handler) signContent(r *http.Request, content string) string {
 }
 
 func (h *Handler) imageProxyURL(r *http.Request, key string) string {
-	scheme := "http"
-	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-		scheme = proto
-	} else if r.TLS != nil {
-		scheme = "https"
+	return imageRequestScheme(r) + "://" + r.Host + "/api/v1/berita/images/" + key
+}
+
+// imageRequestScheme resolves the externally visible scheme for image proxy URLs.
+// Trusts an https X-Forwarded-Proto, then direct TLS, otherwise defaults to
+// https for any public host (CaaS/LB terminate TLS). Only local development
+// hosts produce http.
+func imageRequestScheme(r *http.Request) string {
+	if proto := r.Header.Get("X-Forwarded-Proto"); strings.EqualFold(proto, "https") {
+		return "https"
 	}
-	return scheme + "://" + r.Host + "/api/v1/berita/images/" + key
+	if r.TLS != nil {
+		return "https"
+	}
+	if isLocalHost(r.Host) {
+		return "http"
+	}
+	return "https"
+}
+
+func isLocalHost(host string) bool {
+	h := host
+	if i := strings.IndexByte(h, ':'); i >= 0 {
+		h = h[:i]
+	}
+	return h == "localhost" || h == "127.0.0.1" || h == "::1" || h == "0.0.0.0"
 }
 
 func (h *Handler) deleteObject(ctx context.Context, objectPath string) {
