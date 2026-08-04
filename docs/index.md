@@ -62,6 +62,7 @@ All endpoints are prefixed with `/api/v1`.
 | `POST` | `/berita` | Create a new berita (news article) | Yes | jurnal |
 | `GET` | `/berita` | List all berita | No | — |
 | `GET` | `/berita/{id}` | Get a berita by ID | No | — |
+| `POST` | `/berita/{id}/engagement` | Record article engagement | No | — |
 | `PUT` | `/berita/{id}` | Update a berita by ID | Yes | jurnal |
 | `DELETE` | `/berita/{id}` | Delete a berita by ID | Yes | jurnal |
 | `POST` | `/berita/{id}/image` | Upload cover image for a berita | Yes | jurnal |
@@ -76,6 +77,8 @@ All endpoints are prefixed with `/api/v1`.
 | `POST` | `/nexxa/match` | Run Nexxa matching (PPLG/akuntansi/hotel) | No | — |
 | `POST` | `/nexxa/match/validate-input` | Validate Nexxa match input | No | — |
 | `POST` | `/nexxa/match/normalize-output` | Normalize Nexxa match output | No | — |
+| `GET` | `/analytics/summary` | Nexxa/chat analytics summary | Yes | admin |
+| `GET` | `/analytics/berita/summary` | Berita engagement summary | Yes | jurnal, admin |
 
 ### Role Legend
 

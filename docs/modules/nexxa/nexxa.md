@@ -147,7 +147,7 @@ Chat/Nexxa endpoints are public, rate-limited (default 10 req/min/IP), and cappe
 ### Chat
 
 ```
-POST /api/v1/nexxa/chat {chatInput, sessionId}
+POST /api/v1/nexxa/chat {chatInput, sessionId, topic?}
   → middleware.RateLimit → chat.Handler.Chat: MaxBytesReader + JSON decode
     → chat.Service.Chat: trim + require non-empty + ≤300 chars; generate sessionId if empty
       → n8n.Client.Chat: POST {chatInput, sessionId} to N8N_CHAT_PATH
@@ -158,7 +158,7 @@ POST /api/v1/nexxa/chat {chatInput, sessionId}
 ### Nexxa-Match
 
 ```
-POST /api/v1/nexxa/match {jawaban_1..8}
+POST /api/v1/nexxa/match {sessionId?, jawaban_1..8}
   → middleware.RateLimit → match.Handler.NexxaMatch: MaxBytesReader + JSON decode
     → match.Service.NexxaMatch: require exactly 8 answers, each non-empty and ≤500 chars
       → n8n.Client.NexxaMatch: POST jawaban_1..8 to N8N_NEXXA_PATH
@@ -242,6 +242,8 @@ The service propagates the request context into the upstream call, so a browser 
 
 - Input validation is business logic in the service, not the handler.
 - `chatInput` is trimmed before length checks and forwarding; `sessionId` is auto-generated (32 hex chars) when absent.
+- Successful and failed chat requests record only message length, optional frontend-supplied topic (max 80 chars), success, and a SHA-256 session hash; raw chat text is never stored.
+- Nexxa-Match records success, recommended major, percentages, and a SHA-256 session hash; raw answers and reasons are never stored.
 - Nexxa requires exactly 8 answers; answers are trimmed and forwarded normalized.
 - The four stateless transforms are pure — no DB, no upstream calls — and complete in well under 500ms.
 - `validate-input` never truncates silently: oversized fields are rejected with `400` so the frontend can message the user.

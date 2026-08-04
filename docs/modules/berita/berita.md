@@ -40,6 +40,7 @@ Reads are **public** — listing and reading articles requires no authentication
 |---|---|---|---|---|
 | GET | /api/v1/berita | List | List all news articles | public |
 | GET | /api/v1/berita/{id} | Get | Get article by ID | public |
+| POST | /api/v1/berita/{id}/engagement | Engagement | Record a read/share/link event | public |
 | GET | /api/v1/berita/images/{key} | GetImage | Stream an image object by key (never expires) | public |
 | POST | /api/v1/berita | Create | Create a new article | jurnal |
 | PUT | /api/v1/berita/{id} | Update | Update article (author only) | jurnal |
@@ -54,6 +55,16 @@ Reads are **public** — listing and reading articles requires no authentication
 2. **Embed** — the frontend inserts that key into the markdown (`![caption](<key>)`) and saves via POST/PUT. The backend normalizes any signed URL back to a bare key on write (`normalizeImageRefs`).
 3. **Read** — `Get`/`List` resolve internal `berita/...` keys to stable proxy URLs inside the returned `content` and `image_url` (`resolveImageRefs`). Each URL points at `GET /api/v1/berita/images/{key}`, which streams the object from storage on every request — so URLs never expire and long-open pages cannot go stale. External URLs pass through untouched.
 4. **Delete** — when an image is removed from the editor, the frontend calls `DELETE /api/v1/berita/{id}/images?key={key}` (and on editor teardown for uploads never embedded). The key is validated to be a bare key under `berita/{id}/content/` — it cannot target the cover image, another article's images, or arbitrary objects.
+
+### Engagement analytics
+
+`GET /api/v1/berita/{id}` records a `berita.view` event. The frontend records meaningful actions through `POST /api/v1/berita/{id}/engagement`:
+
+```json
+{"event":"read_50","sessionId":"anonymous-session-id"}
+```
+
+Allowed events: `read_50`, `read_90`, `share`, `link_click`. Events contain only article ID and SHA-256 session hash. They do not store article content, titles, IP addresses, or link URLs. `GET /api/v1/analytics/berita/summary?days=30` returns aggregate event counts and requires `jurnal` or `admin` authentication.
 
 ## Data flow
 
