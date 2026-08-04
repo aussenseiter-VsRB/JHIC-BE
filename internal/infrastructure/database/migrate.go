@@ -33,7 +33,7 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool, dir string) error {
 
 	var migrations []migration
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") || strings.HasSuffix(e.Name(), ".down.sql") {
 			continue
 		}
 		parts := strings.SplitN(e.Name(), "_", 2)
@@ -71,6 +71,52 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool, dir string) error {
 		if _, err := pool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", m.version); err != nil {
 			return fmt.Errorf("record migration %d: %w", m.version, err)
 		}
+	}
+	return nil
+}
+
+func RollbackMigration(ctx context.Context, pool *pgxpool.Pool, dir string, version int) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("read migrations dir: %w", err)
+	}
+
+	var downName string
+	prefix := fmt.Sprintf("%03d_", version)
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasPrefix(e.Name(), prefix) && strings.HasSuffix(e.Name(), ".down.sql") {
+			downName = e.Name()
+			break
+		}
+	}
+	if downName == "" {
+		return fmt.Errorf("rollback script not found for migration %d", version)
+	}
+
+	sql, err := os.ReadFile(filepath.Join(dir, downName))
+	if err != nil {
+		return fmt.Errorf("read rollback %s: %w", downName, err)
+	}
+	var applied int
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM schema_migrations WHERE version = $1", version).Scan(&applied); err != nil {
+		return fmt.Errorf("check migration %d: %w", version, err)
+	}
+	if applied == 0 {
+		return fmt.Errorf("migration %d is not applied", version)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin rollback: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, string(sql)); err != nil {
+		return fmt.Errorf("apply rollback %s: %w", downName, err)
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM schema_migrations WHERE version = $1", version); err != nil {
+		return fmt.Errorf("unrecord migration %d: %w", version, err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit rollback %d: %w", version, err)
 	}
 	return nil
 }
