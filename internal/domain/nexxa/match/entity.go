@@ -1,14 +1,15 @@
 package match
 
 type NexxaRequest struct {
-	Jawaban1 string `json:"jawaban_1"`
-	Jawaban2 string `json:"jawaban_2"`
-	Jawaban3 string `json:"jawaban_3"`
-	Jawaban4 string `json:"jawaban_4"`
-	Jawaban5 string `json:"jawaban_5"`
-	Jawaban6 string `json:"jawaban_6"`
-	Jawaban7 string `json:"jawaban_7"`
-	Jawaban8 string `json:"jawaban_8"`
+	SessionID string `json:"sessionId,omitempty"`
+	Jawaban1  string `json:"jawaban_1"`
+	Jawaban2  string `json:"jawaban_2"`
+	Jawaban3  string `json:"jawaban_3"`
+	Jawaban4  string `json:"jawaban_4"`
+	Jawaban5  string `json:"jawaban_5"`
+	Jawaban6  string `json:"jawaban_6"`
+	Jawaban7  string `json:"jawaban_7"`
+	Jawaban8  string `json:"jawaban_8"`
 }
 
 func (n NexxaRequest) Answers() []string {

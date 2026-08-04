@@ -10,18 +10,24 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/analytics"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/match/content"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
 )
 
 type Handler struct {
-	svc   *Service
-	limit func(http.Handler) http.Handler
+	svc       *Service
+	limit     func(http.Handler) http.Handler
+	analytics *analytics.Service
 }
 
-func NewHandler(svc *Service, limit func(http.Handler) http.Handler) *Handler {
-	return &Handler{svc: svc, limit: limit}
+func NewHandler(svc *Service, limit func(http.Handler) http.Handler, tracking ...*analytics.Service) *Handler {
+	var a *analytics.Service
+	if len(tracking) > 0 {
+		a = tracking[0]
+	}
+	return &Handler{svc: svc, limit: limit, analytics: a}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -39,6 +45,16 @@ func (h *Handler) NexxaMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.svc.NexxaMatch(r.Context(), input.Answers())
+	if h.analytics != nil {
+		props := map[string]any{"success": err == nil}
+		if resp != nil {
+			props["recommended_major"] = resp.NamaJurusan
+			props["pplg_percent"] = resp.PersentasePPLG
+			props["akuntansi_percent"] = resp.PersentaseAkuntansi
+			props["hotel_percent"] = resp.PersentaseHotel
+		}
+		h.analytics.Record(r.Context(), "match.completed", input.SessionID, nil, props)
+	}
 	if err != nil {
 		h.writeServiceError(w, err)
 		return

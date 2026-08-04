@@ -3,6 +3,7 @@ package internal
 import (
 	"net/http"
 
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/analytics"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/chat"
@@ -13,7 +14,7 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 )
 
-func NewRouter(ah *auth.Handler, uh *user.Handler, bh *berita.Handler, pklHnd *pkl.Handler, chatHnd *chat.Handler, matchHnd *match.Handler, cvHnd *cvreview.Handler, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler, roleCheck middleware.RoleChecker, corsOrigins []string) http.Handler {
+func NewRouter(ah *auth.Handler, uh *user.Handler, bh *berita.Handler, pklHnd *pkl.Handler, chatHnd *chat.Handler, matchHnd *match.Handler, cvHnd *cvreview.Handler, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler, roleCheck middleware.RoleChecker, corsOrigins []string, analyticsHandlers ...*analytics.Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	ah.Register(mux)
@@ -23,6 +24,12 @@ func NewRouter(ah *auth.Handler, uh *user.Handler, bh *berita.Handler, pklHnd *p
 	chatHnd.Register(mux)
 	matchHnd.Register(mux)
 	cvHnd.Register(mux)
+	if len(analyticsHandlers) > 0 && analyticsHandlers[0] != nil {
+		analyticsHandlers[0].Register(mux, func(next http.Handler) http.Handler { return authMw(middleware.RequireRole("admin")(roleCheck)(next)) })
+		analyticsHandlers[0].RegisterBerita(mux, func(next http.Handler) http.Handler {
+			return authMw(middleware.RequireRole("jurnal", "admin")(roleCheck)(next))
+		})
+	}
 
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

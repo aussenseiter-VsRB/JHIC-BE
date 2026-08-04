@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/analytics"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
 	stor "github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/storage"
@@ -23,12 +24,17 @@ import (
 )
 
 type Handler struct {
-	svc   *Service
-	store stor.Client
+	svc       *Service
+	store     stor.Client
+	analytics *analytics.Service
 }
 
-func NewHandler(svc *Service, store stor.Client) *Handler {
-	return &Handler{svc: svc, store: store}
+func NewHandler(svc *Service, store stor.Client, tracking ...*analytics.Service) *Handler {
+	var a *analytics.Service
+	if len(tracking) > 0 {
+		a = tracking[0]
+	}
+	return &Handler{svc: svc, store: store, analytics: a}
 }
 
 func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler) {
@@ -36,6 +42,7 @@ func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 	mux.Handle("GET /api/v1/berita", http.HandlerFunc(h.List))
 	mux.Handle("GET /api/v1/berita/images/{key...}", http.HandlerFunc(h.GetImage))
 	mux.Handle("GET /api/v1/berita/{id}", http.HandlerFunc(h.Get))
+	mux.Handle("POST /api/v1/berita/{id}/engagement", http.HandlerFunc(h.Engagement))
 	mux.Handle("PUT /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Update))))
 	mux.Handle("DELETE /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Delete))))
 	mux.Handle("POST /api/v1/berita/{id}/image", authMw(roleMw(http.HandlerFunc(h.UploadImage))))
@@ -101,7 +108,51 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.signArticle(r, b)
+	h.record(r, "berita.view", id, nil)
 	response.JSON(w, http.StatusOK, b)
+}
+
+func (h *Handler) Engagement(w http.ResponseWriter, r *http.Request) {
+	beritaID, err := id.Parse(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var input struct {
+		Event     string `json:"event"`
+		SessionID string `json:"sessionId"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&input); err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if input.SessionID == "" || len(input.SessionID) > 128 {
+		response.Error(w, http.StatusBadRequest, "sessionId is required")
+		return
+	}
+	if input.Event != "read_50" && input.Event != "read_90" && input.Event != "share" && input.Event != "link_click" {
+		response.Error(w, http.StatusBadRequest, "invalid engagement event")
+		return
+	}
+	if b, err := h.svc.ByID(r.Context(), beritaID); err != nil {
+		response.Error(w, http.StatusInternalServerError, "internal server error")
+		return
+	} else if b == nil {
+		response.Error(w, http.StatusNotFound, "berita not found")
+		return
+	}
+	h.recordSession(r, "berita."+input.Event, beritaID, input.SessionID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) record(r *http.Request, event string, beritaID id.ID, properties map[string]any) {
+	h.recordSession(r, event, beritaID, r.Header.Get("X-Session-ID"))
+}
+
+func (h *Handler) recordSession(r *http.Request, event string, beritaID id.ID, sessionID string) {
+	if h.analytics != nil {
+		h.analytics.Record(r.Context(), event, sessionID, nil, map[string]any{"berita_id": beritaID})
+	}
 }
 
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {

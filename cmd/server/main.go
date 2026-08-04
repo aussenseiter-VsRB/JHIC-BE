@@ -13,6 +13,8 @@ import (
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/config"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal"
+	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/analytics"
+	analyticspg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/analytics/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth"
 	authpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/auth/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/berita"
@@ -77,8 +79,11 @@ func main() {
 	}
 
 	beritaRepo := beritapg.NewRepository(pool)
+	analyticsRepo := analyticspg.NewRepository(pool)
+	analyticsSvc := analytics.NewService(analyticsRepo)
+	analyticsHnd := analytics.NewHandler(analyticsRepo)
 	beritaSvc := berita.NewService(beritaRepo)
-	beritaHnd := berita.NewHandler(beritaSvc, b2Client)
+	beritaHnd := berita.NewHandler(beritaSvc, b2Client, analyticsSvc)
 
 	pklRepo := pklpg.NewRepository(pool)
 	pklSvc := pkl.NewService(pklRepo, userRepo)
@@ -96,9 +101,9 @@ func main() {
 		Timeout:      cfg.N8NTimeout,
 	})
 	chatSvc := chat.NewService(n8nClient)
-	chatHnd := chat.NewHandler(chatSvc, middleware.RateLimit(cfg.AIRateLimit))
+	chatHnd := chat.NewHandler(chatSvc, middleware.RateLimit(cfg.AIRateLimit), analyticsSvc)
 	matchSvc := match.NewService(n8nClient)
-	matchHnd := match.NewHandler(matchSvc, middleware.RateLimit(cfg.AIRateLimit))
+	matchHnd := match.NewHandler(matchSvc, middleware.RateLimit(cfg.AIRateLimit), analyticsSvc)
 
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
@@ -117,7 +122,7 @@ func main() {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, authMw, roleMw, roleChecker, cfg.CORSAllowedOrigin)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, authMw, roleMw, roleChecker, cfg.CORSAllowedOrigin, analyticsHnd)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
