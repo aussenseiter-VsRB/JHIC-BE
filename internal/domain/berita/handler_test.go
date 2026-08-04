@@ -62,6 +62,24 @@ func TestExtractObjectPath(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "b2 path-style strips bucket",
+			url:     "https://s3.eu-central-003.backblazeb2.com/jhic-berita-images/berita/1/content/x.png?X-Amz-Signature=abc",
+			want:    "berita/1/content/x.png",
+			wantErr: false,
+		},
+		{
+			name:    "minio localhost path-style strips bucket",
+			url:     "http://localhost:9000/jhic-berita-images/berita/1/x.png?X-Amz-Signature=abc",
+			want:    "berita/1/x.png",
+			wantErr: false,
+		},
+		{
+			name:    "b2 host-style keeps full path",
+			url:     "https://jhic-berita-images.s3.eu-central-003.backblazeb2.com/berita/1/x.png",
+			want:    "berita/1/x.png",
+			wantErr: false,
+		},
+		{
 			name:    "invalid url",
 			url:     "://invalid",
 			want:    "",

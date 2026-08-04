@@ -9,7 +9,7 @@ type: editable
 
 ## Overview
 
-The `berita` domain handles news article CRUD and image management. Articles are authored by users with the `jurnal` role. The article `content` is plain markdown with support for multiple paragraphs, headings, lists, bold/italic, blockquotes, links, and inline images embedded in the text ("mini Google Docs"). Images are uploaded to S3-compatible storage (Backblaze B2) and served via presigned URLs. Future email rendering will use the same markdown (via goldmark) — no format migration needed.
+The `berita` domain handles news article CRUD and image management. Articles are authored by users with the `jurnal` role. The article `content` is plain markdown with support for multiple paragraphs, headings, lists, bold/italic, blockquotes, links, and inline images embedded in the text ("mini Google Docs"). Images are uploaded to S3-compatible storage (Backblaze B2) and served through a **read-through proxy** endpoint that never expires. Future email rendering will use the same markdown (via goldmark) — no format migration needed.
 
 ## Content format
 
@@ -40,6 +40,7 @@ Reads are **public** — listing and reading articles requires no authentication
 |---|---|---|---|---|
 | GET | /api/v1/berita | List | List all news articles | public |
 | GET | /api/v1/berita/{id} | Get | Get article by ID | public |
+| GET | /api/v1/berita/images/{key} | GetImage | Stream an image object by key (never expires) | public |
 | POST | /api/v1/berita | Create | Create a new article | jurnal |
 | PUT | /api/v1/berita/{id} | Update | Update article (author only) | jurnal |
 | DELETE | /api/v1/berita/{id} | Delete | Delete article + its images (author only) | jurnal |
@@ -51,7 +52,7 @@ Reads are **public** — listing and reading articles requires no authentication
 
 1. **Upload** — `POST /api/v1/berita/{id}/images` (multipart `image` field). Author-only; the article must exist. Validates MIME (jpeg/png/gif/webp) and 5 MB max. Stores the object at `berita/{id}/content/{uuid}.{ext}` and returns `{"image_url":"<object key>"}`.
 2. **Embed** — the frontend inserts that key into the markdown (`![caption](<key>)`) and saves via POST/PUT. The backend normalizes any signed URL back to a bare key on write (`normalizeImageRefs`).
-3. **Read** — `Get`/`List` resolve internal `berita/...` keys to 24h presigned URLs inside the returned `content` (`resolveImageRefs`). External URLs pass through untouched.
+3. **Read** — `Get`/`List` resolve internal `berita/...` keys to stable proxy URLs inside the returned `content` and `image_url` (`resolveImageRefs`). Each URL points at `GET /api/v1/berita/images/{key}`, which streams the object from storage on every request — so URLs never expire and long-open pages cannot go stale. External URLs pass through untouched.
 4. **Delete** — when an image is removed from the editor, the frontend calls `DELETE /api/v1/berita/{id}/images?key={key}` (and on editor teardown for uploads never embedded). The key is validated to be a bare key under `berita/{id}/content/` — it cannot target the cover image, another article's images, or arbitrary objects.
 
 ## Data flow
@@ -59,7 +60,10 @@ Reads are **public** — listing and reading articles requires no authentication
 ```
 GET /api/v1/berita
   → handler.List → service.List → pg.List (SELECT ... ORDER BY created_at DESC)
-  → handler signs each image_url + resolves inline content image keys via PresignGet (24h TTL)
+  → handler rewrites each image_url + inline content image key to a proxy URL under /api/v1/berita/images/{key}
+
+GET /api/v1/berita/images/{key}
+  → handler.GetImage: validate key prefix → store.Get(key) → stream bytes (long-lived Cache-Control)
 
 POST /api/v1/berita
   → handler.Create: decode JSON → validate title → normalizeImageRefs(content)
@@ -95,7 +99,7 @@ DELETE /api/v1/berita/{id}
 - Content is plain markdown, required, and limited to 100 KB.
 - Image uploads are limited to 5 MB, accepted types: `image/jpeg`, `image/png`, `image/gif`, `image/webp`.
 - Cover images are stored at `berita/{beritaID}/{uuid}.{ext}`; inline images at `berita/{beritaID}/content/{uuid}.{ext}`.
-- Stored `content` and `image_url` contain object keys (never signed URLs). Signed URLs are generated per response.
+- Stored `content` and `image_url` contain object keys (never signed URLs). On read they are resolved to proxy URLs under `GET /api/v1/berita/images/{key}`; the backend streams the object so URLs do not expire.
 - Deleting an article also deletes its cover and all inline images referenced in its content.
 - Orphaned inline images (uploaded, then never embedded or explicitly deleted) are not tracked in the database; normal editor flows clean them up via the delete endpoint. A storage garbage-collection job is a potential future follow-up.
 

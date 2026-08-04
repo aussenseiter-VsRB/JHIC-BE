@@ -60,6 +60,10 @@ func main() {
 	userSvc := user.NewService(userRepo)
 	userHnd := user.NewHandler(userSvc)
 
+	if cfg.B2Endpoint == "" || cfg.B2KeyID == "" || cfg.B2AppKey == "" {
+		log.Fatalf("b2 storage: B2_ENDPOINT, B2_KEY_ID and B2_APP_KEY must be set (see .env.example)")
+	}
+
 	b2Cfg := storage.B2Config{
 		Endpoint: cfg.B2Endpoint,
 		Region:   cfg.B2Region,

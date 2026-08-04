@@ -82,6 +82,30 @@ func (c *B2Client) Upload(ctx context.Context, objectPath string, contentType st
 	return clean, nil
 }
 
+func (c *B2Client) Get(ctx context.Context, objectPath string) (*Object, error) {
+	clean := strings.TrimPrefix(objectPath, "/")
+	out, err := c.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(clean),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("s3 get: %w", err)
+	}
+	contentType := ""
+	if out.ContentType != nil {
+		contentType = *out.ContentType
+	}
+	var size int64
+	if out.ContentLength != nil {
+		size = *out.ContentLength
+	}
+	return &Object{
+		Body:          out.Body,
+		ContentType:   contentType,
+		ContentLength: size,
+	}, nil
+}
+
 func (c *B2Client) PresignGet(ctx context.Context, objectPath string, ttl time.Duration) (string, error) {
 	clean := strings.TrimPrefix(objectPath, "/")
 	presignClient := s3.NewPresignClient(c.client)

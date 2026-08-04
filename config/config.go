@@ -54,7 +54,7 @@ func Load() *Config {
 		B2KeyID:           getEnv("B2_KEY_ID", ""),
 		B2AppKey:          getEnv("B2_APP_KEY", ""),
 		B2Bucket:          getEnv("B2_BUCKET", "jhic-berita-images"),
-		B2Region:          getEnv("B2_REGION", ""),
+		B2Region:          resolveB2Region(getEnv("B2_REGION", ""), getEnv("B2_ENDPOINT", "s3.eu-central-003.backblazeb2.com")),
 
 		N8NBaseURL:      getEnv("N8N_BASE_URL", "https://n8n-b0wow8osw0okkcwc0g0gog4o.dev.usbypkp.ac.id"),
 		N8NChatPath:     getEnv("N8N_CHAT_PATH", "/webhook/d1b0712b-8783-46ee-8add-5a386132f460/chat"),
@@ -74,4 +74,24 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func resolveB2Region(region, endpoint string) string {
+	if region != "" {
+		return region
+	}
+	host := endpoint
+	if i := strings.Index(host, "://"); i >= 0 {
+		host = host[i+len("://"):]
+	}
+	if i := strings.Index(host, "/"); i >= 0 {
+		host = host[:i]
+	}
+	if strings.HasPrefix(host, "s3.") && strings.HasSuffix(host, ".backblazeb2.com") {
+		parts := strings.Split(host, ".")
+		if len(parts) >= 4 && parts[1] != "" {
+			return parts[1]
+		}
+	}
+	return "us-east-005"
 }

@@ -82,6 +82,11 @@ func TestNormalizeImageRefs(t *testing.T) {
 			want:    `![a](berita/1/content/x.png)`,
 		},
 		{
+			name:    "b2 path-style signed url normalized to key",
+			content: `![a](https://s3.eu-central-003.backblazeb2.com/jhic-berita-images/berita/1/content/x.png?X-Amz-Signature=abc&X-Amz-Date=20260803T071952Z)`,
+			want:    `![a](berita/1/content/x.png)`,
+		},
+		{
 			name:    "external url untouched",
 			content: `![a](https://example.com/photo.png)`,
 			want:    `![a](https://example.com/photo.png)`,

@@ -57,9 +57,9 @@ type: Enforce
 
 ## S3-compatible storage (2026-07-20)
 
-**Decision:** Use `aws-sdk-go-v2` with Backblaze B2 as the primary object store. Support MinIO for local development via Docker Compose profiles.
+**Decision:** Use `aws-sdk-go-v2` with Backblaze B2 as the primary object store. Support MinIO for local development via Docker Compose profiles. Images are served to clients through a read-through proxy endpoint (`GET /api/v1/berita/images/{key}`) that streams the object from storage per request, so served URLs never expire.
 
-**Rationale:** Backblaze B2 is S3-compatible, so the standard AWS SDK works without a custom client. The `storage.Client` interface (`Upload`, `Delete`, `PresignGet`) keeps the storage layer swappable — swap the endpoint and credentials to point at MinIO, AWS S3, or any S3-compatible store. Presigned URLs avoid exposing bucket credentials to clients and enable direct browser uploads if needed. The interface is in `internal/infrastructure/storage/storage.go`, with a B2 implementation in `b2.go`.
+**Rationale:** Backblaze B2 is S3-compatible, so the standard AWS SDK works without a custom client. The `storage.Client` interface (`Upload`, `Get`, `Delete`) keeps the storage layer swappable — swap the endpoint and credentials to point at MinIO, AWS S3, or any S3-compatible store. A proxy endpoint avoids exposing bucket credentials to clients and, unlike presigned URLs, produces stable URLs that cannot expire, so cached pages and long-open clients never break. (Presigned URLs were the initial approach; they were retired because a URL baked into stored content silently dies after the 24h TTL.)
 
 ## Role-based access control (2026-07-20)
 

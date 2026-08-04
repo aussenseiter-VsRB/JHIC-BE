@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
-	"time"
 
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/middleware"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/response"
@@ -32,6 +34,7 @@ func NewHandler(svc *Service, store stor.Client) *Handler {
 func (h *Handler) Register(mux *http.ServeMux, authMw func(http.Handler) http.Handler, roleMw func(http.Handler) http.Handler) {
 	mux.Handle("POST /api/v1/berita", authMw(roleMw(http.HandlerFunc(h.Create))))
 	mux.Handle("GET /api/v1/berita", http.HandlerFunc(h.List))
+	mux.Handle("GET /api/v1/berita/images/{key...}", http.HandlerFunc(h.GetImage))
 	mux.Handle("GET /api/v1/berita/{id}", http.HandlerFunc(h.Get))
 	mux.Handle("PUT /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Update))))
 	mux.Handle("DELETE /api/v1/berita/{id}", authMw(roleMw(http.HandlerFunc(h.Delete))))
@@ -66,7 +69,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		h.writeServiceError(w, err)
 		return
 	}
-	h.signArticle(r.Context(), b)
+	h.signArticle(r, b)
 	response.JSON(w, http.StatusCreated, b)
 }
 
@@ -77,7 +80,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range list {
-		h.signArticle(r.Context(), &list[i])
+		h.signArticle(r, &list[i])
 	}
 	response.JSON(w, http.StatusOK, list)
 }
@@ -97,8 +100,31 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusNotFound, "berita not found")
 		return
 	}
-	h.signArticle(r.Context(), b)
+	h.signArticle(r, b)
 	response.JSON(w, http.StatusOK, b)
+}
+
+func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
+	key := r.PathValue("key")
+	if !isValidImageKey(key) {
+		response.Error(w, http.StatusBadRequest, "invalid image key")
+		return
+	}
+	obj, err := h.store.Get(r.Context(), key)
+	if err != nil {
+		response.Error(w, http.StatusNotFound, "image not found")
+		return
+	}
+	defer obj.Body.Close()
+
+	w.Header().Set("Content-Type", obj.ContentType)
+	if obj.ContentLength > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(obj.ContentLength, 10))
+	}
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	if _, err := io.Copy(w, obj.Body); err != nil {
+		log.Printf("berita: stream image %q: %v", key, err)
+	}
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +154,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		h.writeServiceError(w, err)
 		return
 	}
-	h.signArticle(r.Context(), b)
+	h.signArticle(r, b)
 	response.JSON(w, http.StatusOK, b)
 }
 
@@ -181,7 +207,7 @@ func (h *Handler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.signArticle(r.Context(), b)
+	h.signArticle(r, b)
 	response.JSON(w, http.StatusOK, map[string]string{"image_url": b.ImageURL})
 }
 
@@ -310,27 +336,32 @@ func (h *Handler) uploadImage(w http.ResponseWriter, r *http.Request, prefix str
 	return objectPath, true
 }
 
-func (h *Handler) signArticle(ctx context.Context, b *Berita) {
-	h.signImageURL(ctx, b)
-	b.Content = h.signContent(ctx, b.Content)
+func (h *Handler) signArticle(r *http.Request, b *Berita) {
+	h.signImageURL(r, b)
+	b.Content = h.signContent(r, b.Content)
 }
 
-func (h *Handler) signImageURL(ctx context.Context, b *Berita) {
+func (h *Handler) signImageURL(r *http.Request, b *Berita) {
 	if b.ImageURL == "" {
 		return
 	}
-	signed, err := h.store.PresignGet(ctx, b.ImageURL, 24*time.Hour)
-	if err != nil {
-		b.ImageURL = ""
-		return
-	}
-	b.ImageURL = signed
+	b.ImageURL = h.imageProxyURL(r, b.ImageURL)
 }
 
-func (h *Handler) signContent(ctx context.Context, content string) string {
+func (h *Handler) signContent(r *http.Request, content string) string {
 	return resolveImageRefs(content, func(key string) (string, error) {
-		return h.store.PresignGet(ctx, key, 24*time.Hour)
+		return h.imageProxyURL(r, key), nil
 	})
+}
+
+func (h *Handler) imageProxyURL(r *http.Request, key string) string {
+	scheme := "http"
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	} else if r.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + r.Host + "/api/v1/berita/images/" + key
 }
 
 func (h *Handler) deleteObject(ctx context.Context, objectPath string) {
@@ -369,10 +400,40 @@ func isValidContentKey(beritaID id.ID, key string) bool {
 	return strings.HasPrefix(key, prefix) && len(key) > len(prefix)
 }
 
+func isValidImageKey(key string) bool {
+	if key == "" || strings.ContainsAny(key, "\n\r\t ") {
+		return false
+	}
+	if strings.Contains(key, "://") || strings.HasPrefix(key, "/") || strings.ContainsAny(key, "?") || strings.Contains(key, "..") {
+		return false
+	}
+	return strings.HasPrefix(key, "berita/")
+}
+
 func extractObjectPath(imageURL string) (string, error) {
 	parsed, err := url.Parse(imageURL)
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimPrefix(parsed.Path, "/"), nil
+	path := strings.TrimPrefix(parsed.Path, "/")
+	if isPathStyleEndpoint(parsed.Host) {
+		// Path-style S3-compatible URLs are https://<service>/<bucket>/<key>;
+		// the bucket is the first path segment and not part of the object key.
+		if i := strings.Index(path, "/"); i >= 0 {
+			return path[i+1:], nil
+		}
+		return "", nil
+	}
+	return path, nil
+}
+
+func isPathStyleEndpoint(host string) bool {
+	h := host
+	if i := strings.IndexByte(h, ':'); i >= 0 {
+		h = h[:i]
+	}
+	if h == "localhost" || net.ParseIP(h) != nil {
+		return true
+	}
+	return strings.HasPrefix(h, "s3.") && strings.HasSuffix(h, ".backblazeb2.com")
 }
