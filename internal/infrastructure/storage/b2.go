@@ -28,6 +28,19 @@ type B2Client struct {
 	endpoint string
 }
 
+func isValidRegion(region string) bool {
+	if region == "" {
+		return false
+	}
+	for _, r := range region {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '.' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 func NewB2Client(ctx context.Context, cfg B2Config) (*B2Client, error) {
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
@@ -48,6 +61,9 @@ func NewB2Client(ctx context.Context, cfg B2Config) (*B2Client, error) {
 	region := cfg.Region
 	if region == "" {
 		region = "us-east-005"
+	}
+	if !isValidRegion(region) {
+		return nil, fmt.Errorf("invalid B2 region %q: set B2_REGION to a region name only (e.g. eu-central-003), not a KEY=VALUE pair", region)
 	}
 
 	awsCfg, err := config.LoadDefaultConfig(ctx,
