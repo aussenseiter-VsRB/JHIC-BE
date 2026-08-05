@@ -17,16 +17,17 @@ type Config struct {
 	B2Bucket          string
 	B2Region          string
 
-	N8NBaseURL      string
-	N8NChatPath     string
-	N8NChatUsername string
-	N8NChatPassword string
-	N8NNexxaPath    string
-	N8NNexxaSecret  string
-	N8NCvPath       string
-	N8NCvSecret     string
-	N8NTimeout      time.Duration
-	AIRateLimit     int
+	N8NBaseURL       string
+	N8NChatPath      string
+	N8NChatUsername  string
+	N8NChatPassword  string
+	N8NWebhookSecret string
+	N8NNexxaPath     string
+	N8NCvPath        string
+	N8NSpmbKkPath    string
+	N8NSpmbQaPath    string
+	N8NTimeout       time.Duration
+	AIRateLimit      int
 }
 
 func Load() *Config {
@@ -56,15 +57,16 @@ func Load() *Config {
 		B2Bucket:          getEnv("B2_BUCKET", "jhic-berita-images"),
 		B2Region:          resolveB2Region(getEnv("B2_REGION", ""), getEnv("B2_ENDPOINT", "s3.eu-central-003.backblazeb2.com")),
 
-		N8NBaseURL:      getEnv("N8N_BASE_URL", "https://n8n-b0wow8osw0okkcwc0g0gog4o.dev.usbypkp.ac.id"),
-		N8NChatPath:     getEnv("N8N_CHAT_PATH", "/webhook/d1b0712b-8783-46ee-8add-5a386132f460/chat"),
-		N8NChatUsername: getEnv("N8N_CHAT_USERNAME", ""),
-		N8NChatPassword: getEnv("N8N_CHAT_PASSWORD", ""),
-		N8NNexxaPath:    getEnv("N8N_NEXXA_PATH", "/webhook/e44f0376-40ef-42f4-980b-ec38e8390592"),
-		N8NNexxaSecret:  getEnv("N8N_NEXXA_SECRET", ""),
-		N8NCvPath:       getEnv("N8N_CV_PATH", ""),
-		N8NCvSecret:     getEnv("N8N_CV_SECRET", ""),
-		N8NTimeout:      time.Duration(timeout) * time.Second,
+		N8NBaseURL:       getEnv("N8N_BASE_URL", "https://n8n-b0wow8osw0okkcwc0g0gog4o.dev.usbypkp.ac.id"),
+		N8NChatPath:      getEnv("N8N_CHAT_PATH", "/webhook/d1b0712b-8783-46ee-8add-5a386132f460/chat"),
+		N8NChatUsername:  getEnv("N8N_CHAT_USERNAME", ""),
+		N8NChatPassword:  getEnv("N8N_CHAT_PASSWORD", ""),
+		N8NWebhookSecret: getEnv("N8N_WEBHOOK_SECRET", ""),
+		N8NNexxaPath:     getEnv("N8N_NEXXA_PATH", "/webhook/e44f0376-40ef-42f4-980b-ec38e8390592"),
+		N8NCvPath:        getEnv("N8N_CV_PATH", ""),
+		N8NSpmbKkPath:    getEnv("N8N_SPMB_KK_PATH", ""),
+		N8NSpmbQaPath:    getEnv("N8N_SPMB_QA_PATH", ""),
+		N8NTimeout:       time.Duration(timeout) * time.Second,
 		AIRateLimit:     rateLimit,
 	}
 }

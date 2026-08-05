@@ -21,8 +21,11 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/chat"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/cvreview"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/match"
+	nexxaspmb "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/spmb"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
 	pklpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl/pg"
+	spmb "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/spmb"
+	spmbpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/spmb/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	userpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
@@ -162,16 +165,22 @@ func TestMain(m *testing.M) {
 			w.Write([]byte(`{"nama_jurusan":"PPLG","alasan":"cocok","persentase_pplg":60,"persentase_akuntansi":30,"persentase_hotel":10}`))
 		case "/cv-review":
 			w.Write([]byte(cvReviewStubOutput))
+		case "/spmb-kk":
+			w.Write([]byte(kkStubOutput))
+		case "/spmb-qa":
+			w.Write([]byte(`{"output":"SPMB dibuka Juni 2026"}`))
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	n8nClient := n8n.NewClient(n8n.Config{
-		BaseURL:   n8nStub.URL,
-		ChatPath:  "/chat",
-		NexxaPath: "/nexxa",
-		CvPath:    "/cv-review",
-		Timeout:   5 * time.Second,
+		BaseURL:    n8nStub.URL,
+		ChatPath:   "/chat",
+		NexxaPath:  "/nexxa",
+		CvPath:     "/cv-review",
+		SpmbKkPath: "/spmb-kk",
+		SpmbQaPath: "/spmb-qa",
+		Timeout:    5 * time.Second,
 	})
 	chatSvc := chat.NewService(n8nClient)
 	chatHnd := chat.NewHandler(chatSvc, middleware.RateLimit(1000))
@@ -182,6 +191,11 @@ func TestMain(m *testing.M) {
 	authMw := middleware.Auth(tokenValidator)
 	cvSvc := cvreview.NewService(n8nClient)
 	cvHnd := cvreview.NewHandler(cvSvc, authMw, middleware.RateLimit(1000))
+	spmbAISvc := nexxaspmb.NewService(n8nClient)
+	spmbAIHnd := nexxaspmb.NewHandler(spmbAISvc, middleware.RateLimit(1000))
+	spmbRegRepo := spmbpg.NewRepository(pool)
+	spmbRegSvc := spmb.NewService(spmbRegRepo)
+	spmbRegHnd := spmb.NewHandler(spmbRegSvc)
 	roleChecker := func(ctx context.Context, userID id.ID) (string, error) {
 		u, err := userSvc.ByID(ctx, userID)
 		if err != nil {
@@ -194,7 +208,7 @@ func TestMain(m *testing.M) {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, authMw, roleMw, roleChecker, []string{"*"})
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, spmbAIHnd, spmbRegHnd, authMw, roleMw, roleChecker, []string{"*"})
 	server := httptest.NewServer(router)
 
 	testEnv = &env{server: server, pool: pool, store: store, verifyS3: verifyS3}
@@ -210,7 +224,7 @@ func TestMain(m *testing.M) {
 
 func startE2E(t *testing.T) *env {
 	t.Helper()
-	_, err := testEnv.pool.Exec(context.Background(), `TRUNCATE pkl_approval_steps, pkl_requests, sessions, berita, users CASCADE`)
+	_, err := testEnv.pool.Exec(context.Background(), `TRUNCATE pkl_approval_steps, pkl_requests, sessions, berita, users, spmb_registrations CASCADE`)
 	require.NoError(t, err)
 	return testEnv
 }
