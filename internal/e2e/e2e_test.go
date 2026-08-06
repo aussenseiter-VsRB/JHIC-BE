@@ -43,16 +43,6 @@ func doJSON(t *testing.T, method, url, token string, body any) *http.Response {
 	return resp
 }
 
-func doMultipart(t *testing.T, url, contentType string, body []byte) *http.Response {
-	t.Helper()
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", contentType)
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	return resp
-}
-
 func register(t *testing.T, srvURL, email string) (id.ID, string) {
 	t.Helper()
 	resp := doJSON(t, http.MethodPost, srvURL+"/api/v1/auth/register", "", map[string]string{

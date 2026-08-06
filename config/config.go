@@ -24,8 +24,6 @@ type Config struct {
 	N8NWebhookSecret string
 	N8NNexxaPath     string
 	N8NCvPath        string
-	N8NSpmbKkPath    string
-	N8NSpmbQaPath    string
 	N8NTimeout       time.Duration
 	AIRateLimit      int
 }
@@ -64,10 +62,8 @@ func Load() *Config {
 		N8NWebhookSecret: getEnv("N8N_WEBHOOK_SECRET", ""),
 		N8NNexxaPath:     getEnv("N8N_NEXXA_PATH", "/webhook/e44f0376-40ef-42f4-980b-ec38e8390592"),
 		N8NCvPath:        getEnv("N8N_CV_PATH", ""),
-		N8NSpmbKkPath:    getEnv("N8N_SPMB_KK_PATH", ""),
-		N8NSpmbQaPath:    getEnv("N8N_SPMB_QA_PATH", ""),
 		N8NTimeout:       time.Duration(timeout) * time.Second,
-		AIRateLimit:     rateLimit,
+		AIRateLimit:      rateLimit,
 	}
 }
 

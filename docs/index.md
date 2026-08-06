@@ -79,12 +79,6 @@ All endpoints are prefixed with `/api/v1`.
 | `POST` | `/nexxa/match/normalize-output` | Normalize Nexxa match output | No | — |
 | `GET` | `/analytics/summary` | Nexxa/chat analytics summary | Yes | admin |
 | `GET` | `/analytics/berita/summary` | Berita engagement summary | Yes | jurnal, admin |
-| `POST` | `/spmb` | Create an SPMB registration (public) | No | — |
-| `GET` | `/spmb` | List SPMB registrations | Yes | admin |
-| `GET` | `/spmb/{id}` | Get one SPMB registration | Yes | admin |
-| `POST` | `/spmb/{id}/status` | Approve/cancel an SPMB registration | Yes | admin |
-| `POST` | `/nexxa/spmb/parse-kk` | Parse a KK photo/PDF and auto-fill SPMB form fields | No | — |
-| `POST` | `/nexxa/spmb/ask` | Ask an SPMB/PPDB question | No | — |
 
 ### Role Legend
 
@@ -97,4 +91,4 @@ All endpoints are prefixed with `/api/v1`.
 
 - **Auth** (`authMw`): Validates JWT token from `Authorization: Bearer <token>` header. Applied to all authenticated endpoints.
 - **Role** (`roleMw`): Restricts access to specific roles. Applied after auth middleware on role-protected endpoints.
-- **RateLimit**: Applied to Nexxa AI endpoints (`/nexxa/chat`, `/nexxa/match`, `/nexxa/spmb/parse-kk`, `/nexxa/spmb/ask`) to prevent abuse.
+- **RateLimit**: Applied to Nexxa AI endpoints (`/nexxa/chat`, `/nexxa/match`) to prevent abuse.

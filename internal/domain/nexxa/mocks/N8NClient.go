@@ -100,62 +100,6 @@ func (_m *N8NClient) NexxaMatch(ctx context.Context, answers []string) (string, 
 	return r0, r1
 }
 
-// SpmbAsk provides a mock function with given fields: ctx, question, sessionID
-func (_m *N8NClient) SpmbAsk(ctx context.Context, question string, sessionID string) (string, error) {
-	ret := _m.Called(ctx, question, sessionID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SpmbAsk")
-	}
-
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
-		return rf(ctx, question, sessionID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
-		r0 = rf(ctx, question, sessionID)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, question, sessionID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// SpmbParseKk provides a mock function with given fields: ctx, imageBase64, mimeType, childName
-func (_m *N8NClient) SpmbParseKk(ctx context.Context, imageBase64 string, mimeType string, childName string) (string, error) {
-	ret := _m.Called(ctx, imageBase64, mimeType, childName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SpmbParseKk")
-	}
-
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (string, error)); ok {
-		return rf(ctx, imageBase64, mimeType, childName)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) string); ok {
-		r0 = rf(ctx, imageBase64, mimeType, childName)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = rf(ctx, imageBase64, mimeType, childName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // NewN8NClient creates a new instance of N8NClient. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewN8NClient(t interface {

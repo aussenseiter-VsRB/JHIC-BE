@@ -18,16 +18,14 @@ import (
 const nexxaHeaderName = "X-JHIC-Secret"
 
 type Config struct {
-	BaseURL         string
-	ChatPath        string
-	ChatUsername    string
-	ChatPassword    string
-	WebhookSecret   string
-	NexxaPath       string
-	CvPath          string
-	SpmbKkPath      string
-	SpmbQaPath      string
-	Timeout         time.Duration
+	BaseURL       string
+	ChatPath      string
+	ChatUsername  string
+	ChatPassword  string
+	WebhookSecret string
+	NexxaPath     string
+	CvPath        string
+	Timeout       time.Duration
 }
 
 type Client struct {
@@ -117,58 +115,6 @@ func (c *Client) CvReview(ctx context.Context, cvText string, wordCount, pageCou
 		return "", err
 	}
 	return raw, nil
-}
-
-func (c *Client) SpmbParseKk(ctx context.Context, imageBase64, mimeType, childName string) (string, error) {
-	payload := map[string]string{
-		"image_base64": imageBase64,
-		"mime_type":    mimeType,
-		"child_name":   childName,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return "", fmt.Errorf("%w: %v", nexxa.ErrN8NUnavailable, err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+c.cfg.SpmbKkPath, bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("%w: %v", nexxa.ErrN8NUnavailable, err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if c.cfg.WebhookSecret != "" {
-		req.Header.Set(nexxaHeaderName, c.cfg.WebhookSecret)
-	}
-
-	raw, err := c.doRaw(req)
-	if err != nil {
-		return "", err
-	}
-	return raw, nil
-}
-
-func (c *Client) SpmbAsk(ctx context.Context, question, sessionID string) (string, error) {
-	payload := map[string]string{"question": question, "session_id": sessionID}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return "", fmt.Errorf("%w: %v", nexxa.ErrN8NUnavailable, err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+c.cfg.SpmbQaPath, bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("%w: %v", nexxa.ErrN8NUnavailable, err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if c.cfg.WebhookSecret != "" {
-		req.Header.Set(nexxaHeaderName, c.cfg.WebhookSecret)
-	}
-
-	var out struct {
-		Output string `json:"output"`
-	}
-	if err := c.do(req, &out); err != nil {
-		return "", err
-	}
-	return out.Output, nil
 }
 
 func (c *Client) do(req *http.Request, out any) error {

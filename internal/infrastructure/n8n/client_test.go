@@ -115,10 +115,10 @@ func TestClient_CvReview(t *testing.T) {
 		})
 
 		client := n8n.NewClient(n8n.Config{
-			BaseURL:  srv.URL,
-			CvPath:   "/cv",
+			BaseURL:       srv.URL,
+			CvPath:        "/cv",
 			WebhookSecret: "cv-secret",
-			Timeout:  time.Second,
+			Timeout:       time.Second,
 		})
 		out, err := client.CvReview(context.Background(), "CV saya", 300, 1)
 		require.NoError(t, err)
@@ -154,92 +154,6 @@ func TestClient_CvReview(t *testing.T) {
 	})
 }
 
-func TestClient_SpmbParseKk(t *testing.T) {
-	t.Run("forwards base64 with secret header and relays raw", func(t *testing.T) {
-		var gotPath, gotSecret string
-		var gotBody map[string]string
-		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-			gotPath = r.URL.Path
-			gotSecret = r.Header.Get("X-JHIC-Secret")
-			gotBody = readBody(t, r)
-			w.Write([]byte(`{"nama":"Budi","nik":"3204123456789012"}`))
-		})
-
-		client := n8n.NewClient(n8n.Config{
-			BaseURL:      srv.URL,
-			SpmbKkPath:   "/spmb-kk",
-			WebhookSecret: "kk-secret",
-			Timeout:      time.Second,
-		})
-		out, err := client.SpmbParseKk(context.Background(), "base64data", "image/jpeg", "Budi")
-		require.NoError(t, err)
-		require.Equal(t, "/spmb-kk", gotPath)
-		require.Equal(t, "kk-secret", gotSecret)
-		require.Equal(t, "base64data", gotBody["image_base64"])
-		require.Equal(t, "image/jpeg", gotBody["mime_type"])
-		require.Equal(t, "Budi", gotBody["child_name"])
-		require.JSONEq(t, `{"nama":"Budi","nik":"3204123456789012"}`, out)
-	})
-
-	t.Run("omits secret header when unset", func(t *testing.T) {
-		var gotSecret string
-		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-			gotSecret = r.Header.Get("X-JHIC-Secret")
-			w.Write([]byte(`{}`))
-		})
-		client := n8n.NewClient(n8n.Config{BaseURL: srv.URL, SpmbKkPath: "/spmb-kk", Timeout: time.Second})
-		_, err := client.SpmbParseKk(context.Background(), "data", "image/png", "Budi")
-		require.NoError(t, err)
-		require.Empty(t, gotSecret)
-	})
-
-	t.Run("non-2xx maps to unavailable", func(t *testing.T) {
-		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "boom", http.StatusInternalServerError)
-		})
-		client := n8n.NewClient(n8n.Config{BaseURL: srv.URL, SpmbKkPath: "/spmb-kk", Timeout: time.Second})
-		_, err := client.SpmbParseKk(context.Background(), "data", "image/jpeg", "Budi")
-		require.ErrorIs(t, err, nexxa.ErrN8NUnavailable)
-	})
-}
-
-func TestClient_SpmbAsk(t *testing.T) {
-	t.Run("forwards question with secret header and relays output", func(t *testing.T) {
-		var gotPath, gotSecret string
-		var gotBody map[string]string
-		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-			gotPath = r.URL.Path
-			gotSecret = r.Header.Get("X-JHIC-Secret")
-			gotBody = readBody(t, r)
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"output": "Juni 2026"})
-		})
-
-		client := n8n.NewClient(n8n.Config{
-			BaseURL:      srv.URL,
-			SpmbQaPath:   "/spmb-qa",
-			WebhookSecret: "qa-secret",
-			Timeout:      time.Second,
-		})
-		out, err := client.SpmbAsk(context.Background(), "Kapan SPMB?", "sess-1")
-		require.NoError(t, err)
-		require.Equal(t, "/spmb-qa", gotPath)
-		require.Equal(t, "qa-secret", gotSecret)
-		require.Equal(t, "Kapan SPMB?", gotBody["question"])
-		require.Equal(t, "sess-1", gotBody["session_id"])
-		require.Equal(t, "Juni 2026", out)
-	})
-
-	t.Run("non-2xx maps to unavailable", func(t *testing.T) {
-		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "boom", http.StatusInternalServerError)
-		})
-		client := n8n.NewClient(n8n.Config{BaseURL: srv.URL, SpmbQaPath: "/spmb-qa", Timeout: time.Second})
-		_, err := client.SpmbAsk(context.Background(), "Kapan SPMB?", "")
-		require.ErrorIs(t, err, nexxa.ErrN8NUnavailable)
-	})
-}
-
 func TestClient_NexxaMatch(t *testing.T) {
 	t.Run("forwards eight answers with secret header", func(t *testing.T) {
 		var gotPath, gotSecret string
@@ -252,10 +166,10 @@ func TestClient_NexxaMatch(t *testing.T) {
 		})
 
 		client := n8n.NewClient(n8n.Config{
-			BaseURL:     srv.URL,
-			NexxaPath:   "/nexxa",
+			BaseURL:       srv.URL,
+			NexxaPath:     "/nexxa",
 			WebhookSecret: "sekret",
-			Timeout:     time.Second,
+			Timeout:       time.Second,
 		})
 		answers := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
 		out, err := client.NexxaMatch(context.Background(), answers)

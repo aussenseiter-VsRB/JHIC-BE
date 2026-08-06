@@ -22,11 +22,8 @@ import (
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/chat"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/cvreview"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/match"
-	nexxaspmb "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/nexxa/spmb"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl"
 	pklpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/pkl/pg"
-	spmb "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/spmb"
-	spmbpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/spmb/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user"
 	userpg "github.com/aussenseiter-VsRB/JHIC-BE/internal/domain/user/pg"
 	"github.com/aussenseiter-VsRB/JHIC-BE/internal/infrastructure/database"
@@ -92,28 +89,20 @@ func main() {
 	pklSvc := pkl.NewService(pklRepo, userRepo)
 	pklHnd := pkl.NewHandler(pklSvc)
 
-	spmbRepo := spmbpg.NewRepository(pool)
-	spmbSvc := spmb.NewService(spmbRepo)
-	spmbRegHnd := spmb.NewHandler(spmbSvc)
-
 	n8nClient := n8n.NewClient(n8n.Config{
-		BaseURL:         cfg.N8NBaseURL,
-		ChatPath:        cfg.N8NChatPath,
-		ChatUsername:    cfg.N8NChatUsername,
-		ChatPassword:    cfg.N8NChatPassword,
-		WebhookSecret:   cfg.N8NWebhookSecret,
-		NexxaPath:       cfg.N8NNexxaPath,
-		CvPath:          cfg.N8NCvPath,
-		SpmbKkPath:      cfg.N8NSpmbKkPath,
-		SpmbQaPath:      cfg.N8NSpmbQaPath,
-		Timeout:         cfg.N8NTimeout,
+		BaseURL:       cfg.N8NBaseURL,
+		ChatPath:      cfg.N8NChatPath,
+		ChatUsername:  cfg.N8NChatUsername,
+		ChatPassword:  cfg.N8NChatPassword,
+		WebhookSecret: cfg.N8NWebhookSecret,
+		NexxaPath:     cfg.N8NNexxaPath,
+		CvPath:        cfg.N8NCvPath,
+		Timeout:       cfg.N8NTimeout,
 	})
 	chatSvc := chat.NewService(n8nClient)
 	chatHnd := chat.NewHandler(chatSvc, middleware.RateLimit(cfg.AIRateLimit), analyticsSvc)
 	matchSvc := match.NewService(n8nClient)
 	matchHnd := match.NewHandler(matchSvc, middleware.RateLimit(cfg.AIRateLimit), analyticsSvc)
-	spmbAISvc := nexxaspmb.NewService(n8nClient)
-	spmbAIHnd := nexxaspmb.NewHandler(spmbAISvc, middleware.RateLimit(cfg.AIRateLimit), analyticsSvc)
 
 	tokenValidator := middleware.TokenValidator(auth.NewTokenValidator(sessionsRepo))
 	authMw := middleware.Auth(tokenValidator)
@@ -132,7 +121,7 @@ func main() {
 	}
 	roleMw := middleware.RequireRole("jurnal")(roleChecker)
 
-	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, spmbAIHnd, spmbRegHnd, authMw, roleMw, roleChecker, cfg.CORSAllowedOrigin, analyticsHnd)
+	router := internal.NewRouter(authHnd, userHnd, beritaHnd, pklHnd, chatHnd, matchHnd, cvHnd, authMw, roleMw, roleChecker, cfg.CORSAllowedOrigin, analyticsHnd)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
